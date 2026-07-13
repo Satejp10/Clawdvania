@@ -2,7 +2,9 @@
 
 A 2D browser metroidvania starring **Clawd**, the orange pixel-crab. Phase 1: a movement/game-feel prototype — one crab, one room, zero excuses.
 
-**Single self-contained `index.html`.** Vanilla JS + Canvas 2D. No engine, no build step, no asset files — sprites are inline pixel arrays, the world is procedural. Open the file in a browser and play.
+**Single self-contained `index.html`.** Vanilla JS + Canvas 2D. No engine, no build step, no asset files — Clawd is an inline pixel-array sprite and the world is entirely procedural. Open the file in a browser and play.
+
+**Look:** a painterly *Autumn Dusk* atmosphere (gradient sky, god rays, parallax hills and trees, drifting leaves, soft turf) rendered smooth at the display's native resolution (HiDPI/`devicePixelRatio`-aware, so it's crisp — not pixelated — at any zoom). Clawd himself stays crisp pixel art as a deliberate contrast.
 
 ## Controls
 
@@ -19,4 +21,4 @@ All movement constants live in the `TUNING` object at the top of `index.html`: r
 
 ## Status
 
-Phase 1 (navigation greybox) — in feel-tuning. World, abilities, and everything else come later.
+Phase 1 (navigation greybox) — smooth-HD Autumn Dusk visual pass done; in feel-tuning. Abilities, enemies, and everything else come later.

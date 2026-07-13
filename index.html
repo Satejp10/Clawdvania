@@ -5,7 +5,7 @@
 <title>Clawdvania</title>
 <style>
   html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
-  canvas { display: block; position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+  canvas { display: block; position: absolute; left: 0; top: 0; image-rendering: auto; }
 </style>
 </head>
 <body>
@@ -54,7 +54,7 @@ const TUNING = {
 // ============================================================================
 // Constants (not feel — structure)
 // ============================================================================
-const VIEW_W = 480, VIEW_H = 270;
+const VIEW_W = 640, VIEW_H = 360;
 const TILE = 16;
 const STEP = 1 / 60;
 
@@ -68,6 +68,15 @@ const JUMP_VEL  = 2 * APEX_PX / TUNING.timeToApex;
 // 90 wide x 17 tall. Human-writable, room-ready for Phase 2.
 // ============================================================================
 const LEVEL = [
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
   "#........................................................................................#",
   "#........................................................................................#",
   "#........................................................................................#",
@@ -120,84 +129,125 @@ const PALETTE = {
 
 const SPR_W = 16, SPR_H = 12;
 
-const FRAMES = {
-  // idle: 2-frame breathe (body lifts one px)
+// Body poses only — eyes are stamped on at bake time (see EYES below), so
+// 6 poses x 4 expressions never has to be hand-drawn.
+// Boxy official Clawd: flat coral slab, side nubs, four stub legs.
+const BODY = {
   idle: [
-    [
-      "...wb.....wb....",
-      "...db.....db....",
-      "....d.....d.....",
-      "..d.ooooooo.d...",
-      ".dd.ooollloo.dd.",
-      "dd.ooollllloo.dd",
-      "d.ooooollooooo.d",
+    { eyeY: 3, rows: [
+      "................",
       "..oooooooooooo..",
-      "..dooooooooood..",
-      "...d.d.d..d.d...",
-      "..d..d..d.d..d..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+    ]},
+    { eyeY: 4, rows: [   // breathe: body settles 1px, legs compress
       "................",
-    ],
-    [
       "................",
-      "...wb.....wb....",
-      "...db.....db....",
-      "....d.....d.....",
-      "..d.ooooooo.d...",
-      ".ddooollllooodd.",
-      "dd.ooollllloo.dd",
-      "d.oooooooooooo.d",
-      "..dooooooooood..",
-      "...d.d.d..d.d...",
-      "..d..d..d.d..d..",
-      "................",
-    ],
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+    ]},
   ],
-  // scuttle: 3-frame leg cycle
   scuttle: [
-    [
-      "...wb.....wb....",
-      "...db.....db....",
-      "....d.....d.....",
-      "..d.ooooooo.d...",
-      ".dd.ooollloo.dd.",
-      "dd.ooollllloo.dd",
-      "d.ooooollooooo.d",
+    { eyeY: 3, rows: [   // legs 1 & 3 planted
+      "................",
       "..oooooooooooo..",
-      "..dooooooooood..",
-      "...d..d...d..d..",
-      "..d....d.d....d.",
-      "................",
-    ],
-    [
-      "...wb.....wb....",
-      "...db.....db....",
-      "....d.....d.....",
-      "..d.ooooooo.d...",
-      ".dd.ooollloo.dd.",
-      "dd.ooollllloo.dd",
-      "d.ooooollooooo.d",
       "..oooooooooooo..",
-      "..dooooooooood..",
-      "...dd..d.d..dd..",
-      "................",
-      "................",
-    ],
-    [
-      "...wb.....wb....",
-      "...db.....db....",
-      "....d.....d.....",
-      "..d.ooooooo.d...",
-      ".dd.ooollloo.dd.",
-      "dd.ooollllloo.dd",
-      "d.ooooollooooo.d",
       "..oooooooooooo..",
-      "..dooooooooood..",
-      "..d..d.....d..d.",
-      ".d..d.......d..d",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...oo....oo.....",
+    ]},
+    { eyeY: 3, rows: [   // all planted
       "................",
-    ],
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+    ]},
+    { eyeY: 3, rows: [   // legs 2 & 4 planted
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "......oo....oo..",
+    ]},
+  ],
+  air: [
+    { eyeY: 3, rows: [   // legs splayed, dangling
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.......oo..",
+      "................",
+    ]},
   ],
 };
+
+// Eye variants, drawn for the LEFT eye and mirrored for the right.
+// dx = offset from the eye anchor column, dy = offset from the frame's eyeY.
+const EYE_L_COL = 5, EYE_R_COL = 10;
+const EYES = {
+  open:  { dx: 0,  dy: 0, rows: ["b", "b"] },
+  blink: { dx: 0,  dy: 1, rows: ["b"] },
+  ouch:  { dx: -1, dy: 0, rows: ["b.", ".b", "b."] },   // >_<
+  happy: { dx: -1, dy: 0, rows: [".b.", "b.b"] },       // ^_^
+};
+
+function stampEyes(rows, eyeY, v) {
+  const grid = rows.map(r => r.padEnd(SPR_W, ".").split(""));
+  const stamp = (vrows, colLeft) => {
+    for (let dy = 0; dy < vrows.length; dy++)
+      for (let dx = 0; dx < vrows[dy].length; dx++)
+        if (vrows[dy][dx] !== ".") grid[eyeY + dy][colLeft + dx] = vrows[dy][dx];
+  };
+  const w = v.rows[0].length;
+  stamp(v.rows, EYE_L_COL + v.dx);
+  const mirrored = v.rows.map(r => r.split("").reverse().join(""));
+  stamp(mirrored, EYE_R_COL - v.dx - w + 1);
+  return grid.map(r => r.join(""));
+}
 
 // Pre-render every frame (and its mirror) to offscreen canvases at boot.
 function bakeFrame(rows, flip) {
@@ -221,9 +271,17 @@ function bakeFrame(rows, flip) {
   c.putImageData(img, 0, 0);
   return cv;
 }
+// BAKED[set][frame][expr] = { right, left } — every pose x expression, once.
 const BAKED = {};
-for (const name of Object.keys(FRAMES)) {
-  BAKED[name] = FRAMES[name].map(f => ({ right: bakeFrame(f, false), left: bakeFrame(f, true) }));
+for (const name of Object.keys(BODY)) {
+  BAKED[name] = BODY[name].map(f => {
+    const out = {};
+    for (const [ename, ev] of Object.entries(EYES)) {
+      const rows = stampEyes(f.rows, f.eyeY + ev.dy, ev);
+      out[ename] = { right: bakeFrame(rows, false), left: bakeFrame(rows, true) };
+    }
+    return out;
+  });
 }
 
 // ============================================================================
@@ -264,6 +322,7 @@ const player = {
   grounded: false, facing: 1,
   coyote: 0, buffer: 0, jumpCutDone: true,
   animTime: 0,
+  fallT: 0, ouchT: 0, idleT: 0, blinkT: 0, blinkNext: 3,
 };
 
 function resetPlayer() {
@@ -271,6 +330,7 @@ function resetPlayer() {
   player.vx = 0; player.vy = 0;
   player.grounded = false; player.facing = 1;
   player.coyote = 0; player.buffer = 0; player.jumpCutDone = true;
+  player.fallT = 0; player.ouchT = 0; player.idleT = 0; player.blinkT = 0; player.blinkNext = 3;
   cam.x = clamp(player.x + player.w / 2 - VIEW_W / 2, 0, ROOM_W - VIEW_W);
   cam.y = clamp(player.y + player.h / 2 - VIEW_H / 2, 0, ROOM_H - VIEW_H);
   cam.fx = player.x + player.w / 2;
@@ -351,6 +411,19 @@ function updatePlayer(dt) {
   // fell out of a pit? (shouldn't happen — floor is solid — but belt & braces)
   if (player.y > ROOM_H + 64) resetPlayer();
 
+  // --- expression bookkeeping (visual only) ---
+  if (!player.grounded && player.vy > 0) {
+    player.fallT += dt;
+  } else if (player.grounded) {
+    if (player.fallT > THEME.face.ouchFall) player.ouchT = THEME.face.ouchShow;
+    player.fallT = 0;
+  }
+  player.ouchT = Math.max(0, player.ouchT - dt);
+  player.idleT = (player.grounded && dir === 0 && Math.abs(player.vx) < 5) ? player.idleT + dt : 0;
+  player.blinkNext -= dt;
+  if (player.blinkNext <= 0) { player.blinkT = THEME.face.blinkLen; player.blinkNext = 2.5 + Math.random() * 2.5; }
+  player.blinkT = Math.max(0, player.blinkT - dt);
+
   // --- animation clock ---
   player.animTime += dt;
 }
@@ -387,16 +460,29 @@ function updateCamera() {
 // Visual only; TUNING stays feel-only.
 // ============================================================================
 const THEME = {
-  skyStops: [[0, "#24406b"], [0.45, "#2f6b7e"], [0.8, "#4fa08f"], [1, "#66b89c"]],
-  sunPos: [150, 58], sunRadius: 270, sunColor: "255,240,205",
-  farColor: "#3a6b8c",
-  midColor: "#27506e",
-  tileBody: "#223c50", tileBodyAlt: "#26445a",
-  mossTop: "#7fd6a8", mossGlow: "#c9f7dd",
-  rim: "#3f7a8a", underShade: "#101d2c",
-  moteColors: ["255,233,168", "191,240,221"],
-  moteCount: 70,
-  vignette: 0.36,
+  // Autumn Dusk — the ArtStation storybook reference, temperature pulled down
+  sky: [[0, "#31406b"], [0.5, "#5d5a7e"], [0.82, "#a5776c"], [1, "#c99a6d"]],
+  sunPos: [500, 90], sunR: 240, sunColor: "255,214,160", sunA: 0.34,
+  far: { top: "#5b4a63", bot: "#463a52", baseY: 200, amp: 26, seed: 101, treeN: 8,
+         tree: { trunk: "#3a2f42", leafHi: "#b0684a", leafLo: "#6e4340" }, cottageX: 940 },
+  mid: { top: "#413650", bot: "#2e2740", baseY: 268, amp: 22, seed: 202, treeN: 6,
+         tree: { trunk: "#241d30", leafHi: "#a85638", leafLo: "#59352f" } },
+  cottageBody: "#3a3048", cottageRoof: "#2c2438",
+  windowLit: "#ffd98a", windowGlow: "rgba(255,200,120,0.5)",
+  earthTop: "#463a52", earthBot: "#2b2338", earthSpeck: "#59462e",
+  grass: "#c08a4a", grassGlow: "#eec584", accent: "#c9563f",
+  rim: "#54455e", underShade: "#1a1526",
+  leafColors: ["#c9803f", "#a85638", "#d9a05a"],
+  leafCount: 80,
+  mist: { y: 240, a: 0.10, tint: "#c9a08a" },
+  gradeTop: "rgba(40,40,90,0.10)", gradeBot: "rgba(180,120,80,0.08)",
+  vignette: 0.34,
+  face: {           // state-based expressions (visual only)
+    ouchFall: 0.45, // s of continuous falling that earns a >_< landing
+    ouchShow: 0.5,  // s the >_< face lingers
+    happyAfter: 4,  // s of standing still before ^_^
+    blinkLen: 0.12, // s a blink lasts
+  },
 };
 
 function mulberry32(seed) {
@@ -414,127 +500,256 @@ const skyCv = makeCanvas(VIEW_W, VIEW_H);
 {
   const c = skyCv.getContext("2d");
   const gr = c.createLinearGradient(0, 0, 0, VIEW_H);
-  for (const [p, col] of THEME.skyStops) gr.addColorStop(p, col);
+  for (const [p, col] of THEME.sky) gr.addColorStop(p, col);
   c.fillStyle = gr; c.fillRect(0, 0, VIEW_W, VIEW_H);
   const [sx, sy] = THEME.sunPos;
-  const sun = c.createRadialGradient(sx, sy, 10, sx, sy, THEME.sunRadius);
-  sun.addColorStop(0, "rgba(" + THEME.sunColor + ",0.42)");
+  const sun = c.createRadialGradient(sx, sy, 10, sx, sy, THEME.sunR);
+  sun.addColorStop(0, "rgba(" + THEME.sunColor + "," + THEME.sunA + ")");
   sun.addColorStop(1, "rgba(" + THEME.sunColor + ",0)");
   c.fillStyle = sun; c.fillRect(0, 0, VIEW_W, VIEW_H);
-  c.fillStyle = "rgba(" + THEME.sunColor + ",0.07)";
-  for (const [dx, w] of [[-30, 26], [40, 40], [130, 30]]) {
+  c.fillStyle = "rgba(" + THEME.sunColor + ",0.06)";
+  for (const [dx, w] of [[-40, 34], [60, 55], [180, 40]]) {
     c.beginPath();
     c.moveTo(sx + dx, -10);
     c.lineTo(sx + dx + w, -10);
-    c.lineTo(sx + dx + w + 150, VIEW_H + 10);
-    c.lineTo(sx + dx + 150 - w, VIEW_H + 10);
+    c.lineTo(sx + dx + w + 200, VIEW_H + 10);
+    c.lineTo(sx + dx + 200 - w, VIEW_H + 10);
     c.closePath(); c.fill();
   }
 }
 
-// --- parallax silhouette layers (tileable strips, baked once) ---
+// --- parallax hill layers: gradient fills, shaded blob trees, one cottage ---
 const LAYER_W = VIEW_W * 2;
-function makeHillLayer(color, baseY, amp, seed, trees) {
+
+function drawTree(c, x, groundY, size, tones, rnd) {
+  c.fillStyle = tones.trunk;
+  c.fillRect(x - size * 0.08, groundY - size * 1.5, Math.max(2, size * 0.16), size * 1.5);
+  const cy = groundY - size * 1.6;
+  for (let i = 0; i < 6; i++) {
+    const ox = (rnd() - 0.5) * size * 1.2, oy = -(rnd()) * size * 0.7;
+    const r = size * (0.45 + rnd() * 0.35);
+    const g = c.createRadialGradient(x + ox - r * 0.3, cy + oy - r * 0.4, r * 0.15, x + ox, cy + oy, r);
+    g.addColorStop(0, tones.leafHi);
+    g.addColorStop(1, tones.leafLo);
+    c.fillStyle = g;
+    c.beginPath(); c.arc(x + ox, cy + oy, r, 0, 6.29); c.fill();
+  }
+}
+
+function drawCottage(c, x, y) {
+  const s = 30;
+  c.fillStyle = THEME.cottageBody;
+  c.fillRect(x - s / 2, y - s * 0.8, s, s * 0.8);
+  c.fillStyle = THEME.cottageRoof;
+  c.beginPath();
+  c.moveTo(x - s * 0.65, y - s * 0.75);
+  c.lineTo(x, y - s * 1.35);
+  c.lineTo(x + s * 0.65, y - s * 0.75);
+  c.closePath(); c.fill();
+  c.fillRect(x + s * 0.18, y - s * 1.28, s * 0.14, s * 0.4);       // chimney
+  const g = c.createRadialGradient(x, y - s * 0.4, 1, x, y - s * 0.4, s * 0.5);
+  g.addColorStop(0, THEME.windowGlow); g.addColorStop(1, "rgba(255,200,120,0)");
+  c.fillStyle = g; c.fillRect(x - s, y - s, s * 2, s * 1.2);       // glow halo
+  c.fillStyle = THEME.windowLit;
+  c.fillRect(x - 3, y - s * 0.5, 7, 8);                            // lit window
+}
+
+function makeHillLayer(L) {
   const cv = makeCanvas(LAYER_W, VIEW_H);
   const c = cv.getContext("2d");
-  const rnd = mulberry32(seed);
+  const rnd = mulberry32(L.seed);
   const ph = [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28];
-  const yAt = (x) => baseY
-    + Math.sin((x / LAYER_W) * 2 * Math.PI + ph[0]) * amp
-    + Math.sin((x / LAYER_W) * 6 * Math.PI + ph[1]) * amp * 0.4
-    + Math.sin((x / LAYER_W) * 14 * Math.PI + ph[2]) * amp * 0.15;
-  c.fillStyle = color;
+  const yAt = (x) => L.baseY
+    + Math.sin((x / LAYER_W) * 2 * Math.PI + ph[0]) * L.amp
+    + Math.sin((x / LAYER_W) * 6 * Math.PI + ph[1]) * L.amp * 0.4
+    + Math.sin((x / LAYER_W) * 14 * Math.PI + ph[2]) * L.amp * 0.15;
+  const g = c.createLinearGradient(0, L.baseY - L.amp - 20, 0, VIEW_H);
+  g.addColorStop(0, L.top); g.addColorStop(1, L.bot);
+  c.fillStyle = g;
   c.beginPath();
   c.moveTo(0, VIEW_H);
   for (let x = 0; x <= LAYER_W; x += 4) c.lineTo(x, yAt(x));
   c.lineTo(LAYER_W, VIEW_H);
   c.closePath(); c.fill();
-  for (let i = 0; i < trees; i++) {           // organic blob trees, wrap-safe
-    const tx = rnd() * LAYER_W, ty = yAt(tx) + 4, s = 7 + rnd() * 13;
-    for (const ox of [-LAYER_W, 0, LAYER_W]) {
-      c.fillRect(tx + ox - 1.5, ty - s * 1.6, 3, s * 1.6);
-      c.beginPath();
-      c.arc(tx + ox, ty - s * 1.7, s, 0, 6.29);
-      c.arc(tx + ox - s * 0.7, ty - s * 1.25, s * 0.7, 0, 6.29);
-      c.arc(tx + ox + s * 0.7, ty - s * 1.25, s * 0.7, 0, 6.29);
-      c.fill();
-    }
+  for (let i = 0; i < L.treeN; i++) {                              // wrap-safe trees
+    const tx = rnd() * LAYER_W, ty = yAt(tx) + 6, s = 10 + rnd() * 14;
+    for (const ox of [-LAYER_W, 0, LAYER_W]) drawTree(c, tx + ox, ty, s, L.tree, mulberry32(L.seed + i * 7));
+  }
+  if (L.cottageX != null) {
+    for (const ox of [-LAYER_W, 0, LAYER_W]) drawCottage(c, L.cottageX + ox, yAt(L.cottageX) + 4);
   }
   return cv;
 }
-const layerFar = makeHillLayer(THEME.farColor, 148, 26, 101, 6);
-const layerMid = makeHillLayer(THEME.midColor, 196, 34, 202, 12);
+const layerFar = makeHillLayer(THEME.far);
+const layerMid = makeHillLayer(THEME.mid);
 
-// --- tile layer: whole room baked once (static in Phase 1) ---
-const tileCv = makeCanvas(ROOM_W, ROOM_H);
+// --- drifting mist band (tileable, baked once, drawn with its own parallax) ---
+const mistCv = makeCanvas(LAYER_W, VIEW_H);
+{
+  const c = mistCv.getContext("2d");
+  c.filter = "blur(6px)";
+  c.globalAlpha = THEME.mist.a;
+  c.fillStyle = THEME.mist.tint;
+  const step = LAYER_W / 18;
+  for (let i = -1; i <= 19; i++) {
+    c.beginPath();
+    c.ellipse(i * step, THEME.mist.y + Math.sin(i * 2.1) * 8, 70, 22, 0, 0, 6.29);
+    c.fill();
+  }
+}
+
+// --- tile layer: whole room baked once, smooth painterly earth + soft turf ---
+// Supersampled (TILE_SS) so thin foreground detail (blades, lit tip) stays crisp
+// once the design buffer is scaled up to the display.
+const TILE_SS = 2;
+const tileCv = makeCanvas(ROOM_W * TILE_SS, ROOM_H * TILE_SS);
 {
   const c = tileCv.getContext("2d");
+  c.scale(TILE_SS, TILE_SS);          // author in design px, store at TILE_SS resolution
+  c.imageSmoothingEnabled = true;
+  c.lineCap = "round";
+  c.lineJoin = "round";
+  const noAlpha = "rgba(0,0,0,0)";
   for (let ty = 0; ty < LEVEL.length; ty++) {
     for (let tx = 0; tx < LEVEL[0].length; tx++) {
       if (LEVEL[ty][tx] !== "#") continue;
       const x = tx * TILE, y = ty * TILE;
-      c.fillStyle = mulberry32(tx * 971 + ty * 331)() < 0.33 ? THEME.tileBodyAlt : THEME.tileBody;
+      const rnd = mulberry32(tx * 971 + ty * 331);
+      const openAbove = !solidAt(x, y - TILE);
+      const openBelow = !solidAt(x, y + TILE);
+      const openL = !solidAt(x - TILE, y);
+      const openR = !solidAt(x + TILE, y);
+
+      // earth body: soft vertical gradient (lit near an exposed top, dark below)
+      const eg = c.createLinearGradient(0, y, 0, y + TILE);
+      eg.addColorStop(0, openAbove ? THEME.earthTop : THEME.earthBot);
+      eg.addColorStop(1, THEME.earthBot);
+      c.fillStyle = eg;
       c.fillRect(x, y, TILE, TILE);
-      if (!solidAt(x - TILE, y)) { c.fillStyle = THEME.rim; c.fillRect(x, y, 1, TILE); }
-      if (!solidAt(x + TILE, y)) { c.fillStyle = THEME.rim; c.fillRect(x + TILE - 1, y, 1, TILE); }
-      if (!solidAt(x, y + TILE)) { c.fillStyle = THEME.underShade; c.fillRect(x, y + TILE - 2, TILE, 2); }
-      if (!solidAt(x, y - TILE)) {
-        c.fillStyle = THEME.mossTop;  c.fillRect(x, y, TILE, 3);
-        c.fillStyle = THEME.mossGlow; c.fillRect(x, y, TILE, 1);
+
+      // soft mottling — large low-alpha blobs, no hard specks
+      c.globalAlpha = 0.10;
+      for (let i = 0; i < 2; i++) {
+        c.fillStyle = rnd() < 0.5 ? THEME.earthSpeck : THEME.underShade;
+        c.beginPath();
+        c.arc(x + rnd() * TILE, y + 3 + rnd() * (TILE - 4), 2 + rnd() * 3, 0, 6.29);
+        c.fill();
+      }
+      c.globalAlpha = 1;
+
+      // exposed-face shading — soft gradients into the tile
+      if (openL) {
+        const sg = c.createLinearGradient(x, 0, x + 5, 0);
+        sg.addColorStop(0, THEME.rim); sg.addColorStop(1, noAlpha);
+        c.fillStyle = sg; c.fillRect(x, y, 5, TILE);
+      }
+      if (openR) {
+        const sg = c.createLinearGradient(x + TILE, 0, x + TILE - 5, 0);
+        sg.addColorStop(0, THEME.rim); sg.addColorStop(1, noAlpha);
+        c.fillStyle = sg; c.fillRect(x + TILE - 5, y, 5, TILE);
+      }
+      if (openBelow) {
+        const ug = c.createLinearGradient(0, y + TILE, 0, y + TILE - 5);
+        ug.addColorStop(0, THEME.underShade); ug.addColorStop(1, noAlpha);
+        c.fillStyle = ug; c.fillRect(x, y + TILE - 5, TILE, 5);
+      }
+
+      // turf cap on exposed tops: soft glow band + smooth curved blades
+      if (openAbove) {
+        const tg = c.createLinearGradient(0, y - 1, 0, y + 7);
+        tg.addColorStop(0, THEME.grassGlow);
+        tg.addColorStop(0.45, THEME.grass);
+        tg.addColorStop(1, noAlpha);
+        c.fillStyle = tg; c.fillRect(x, y - 1, TILE, 8);
+        c.globalAlpha = 0.7;                                   // lit tip highlight
+        c.fillStyle = THEME.grassGlow; c.fillRect(x, y, TILE, 1);
+        c.globalAlpha = 1;
+        const blades = 3 + ((rnd() * 2) | 0);
+        for (let i = 0; i < blades; i++) {
+          const bx = x + 2 + rnd() * (TILE - 4);
+          const h = 3 + rnd() * 4, lean = (rnd() - 0.5) * 4.5;
+          c.strokeStyle = rnd() < 0.35 ? THEME.grassGlow : THEME.grass;
+          c.lineWidth = 1;
+          c.beginPath();
+          c.moveTo(bx, y + 1);
+          c.quadraticCurveTo(bx + lean * 0.5, y - h * 0.6, bx + lean, y - h);
+          c.stroke();
+        }
+        if (rnd() < 0.22) {                                    // occasional soft berry
+          c.fillStyle = THEME.accent;
+          c.beginPath();
+          c.arc(x + 4 + rnd() * (TILE - 8), y - 1, 1.5, 0, 6.29);
+          c.fill();
+        }
       }
     }
   }
 }
 
-// --- vignette (baked once) ---
+// --- color grade + vignette (baked once) ---
 const vigCv = makeCanvas(VIEW_W, VIEW_H);
 {
   const c = vigCv.getContext("2d");
+  const grade = c.createLinearGradient(0, 0, 0, VIEW_H);
+  grade.addColorStop(0, THEME.gradeTop);
+  grade.addColorStop(1, THEME.gradeBot);
+  c.fillStyle = grade; c.fillRect(0, 0, VIEW_W, VIEW_H);
   const g = c.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.45, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.62);
-  g.addColorStop(0, "rgba(8,14,30,0)");
-  g.addColorStop(1, "rgba(8,14,30," + THEME.vignette + ")");
+  g.addColorStop(0, "rgba(10,12,26,0)");
+  g.addColorStop(1, "rgba(10,12,26," + THEME.vignette + ")");
   c.fillStyle = g; c.fillRect(0, 0, VIEW_W, VIEW_H);
 }
 
-// --- drifting light motes (fireflies) — visual only, room-space ---
-const motes = [];
+// --- falling leaves — visual only, room-space ---
+const leaves = [];
 {
   const rnd = mulberry32(777);
-  for (let i = 0; i < THEME.moteCount; i++) motes.push({
+  for (let i = 0; i < THEME.leafCount; i++) leaves.push({
     x: rnd() * ROOM_W, y: rnd() * ROOM_H,
-    vx: 3 + rnd() * 6, ph: rnd() * 6.28, sp: 0.4 + rnd() * 0.9,
-    r: rnd() < 0.5 ? 1 : 2,
-    col: THEME.moteColors[(rnd() * THEME.moteColors.length) | 0],
+    vy: 8 + rnd() * 14, ph: rnd() * 6.28, sp: 0.5 + rnd(),
+    rot: rnd() * 6.28, rotSp: (rnd() - 0.5) * 2,
+    a: 0.55 + rnd() * 0.4,
+    col: THEME.leafColors[(rnd() * THEME.leafColors.length) | 0],
   });
 }
-function updateMotes(dt) {
-  for (const m of motes) {
+function updateLeaves(dt) {
+  for (const m of leaves) {
     m.ph += m.sp * dt;
-    m.x += m.vx * dt;
-    m.y += Math.sin(m.ph) * 4 * dt - 1.5 * dt;
-    if (m.x > ROOM_W) m.x -= ROOM_W;
-    if (m.y < -8) m.y = ROOM_H;
+    m.rot += m.rotSp * dt;
+    m.x += Math.sin(m.ph) * 12 * dt;
+    m.y += m.vy * dt;
+    if (m.y > ROOM_H + 8) { m.y = -8; m.x = Math.random() * ROOM_W; }
+    if (m.x < -8) m.x += ROOM_W;
+    if (m.x > ROOM_W + 8) m.x -= ROOM_W;
   }
 }
 
 // ============================================================================
-// Rendering — internal 480x270 buffer, integer-scaled + letterboxed to window.
+// Rendering — Smooth HD. The world is drawn straight to the display at physical
+// resolution through a design->screen transform. VIEW_W x VIEW_H is the "design
+// space" the camera and physics live in; it's scaled up with bilinear smoothing
+// (painterly, not pixelated). Clawd stays a crisp pixel sprite; HUD text is
+// drawn at native resolution so it's razor sharp.
 // ============================================================================
-const buffer = document.createElement("canvas");
-buffer.width = VIEW_W; buffer.height = VIEW_H;
-const bctx = buffer.getContext("2d");
-
 const screen = document.getElementById("screen");
 const sctx = screen.getContext("2d");
 
-let scale = 1, offX = 0, offY = 0;
+let S = 1, offX = 0, offY = 0, dpr = 1;
 function onResize() {
-  screen.width = innerWidth;
-  screen.height = innerHeight;
-  scale = Math.max(1, Math.floor(Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H)));
-  offX = Math.floor((innerWidth - VIEW_W * scale) / 2);
-  offY = Math.floor((innerHeight - VIEW_H * scale) / 2);
-  sctx.imageSmoothingEnabled = false;
+  // Back the display canvas with PHYSICAL pixels so the browser never has to
+  // bilinear-stretch the final frame (that fractional stretch is what blurred
+  // everything on HiDPI displays, e.g. devicePixelRatio 1.5).
+  dpr = window.devicePixelRatio || 1;
+  const pw = Math.round(innerWidth * dpr);
+  const ph = Math.round(innerHeight * dpr);
+  screen.width = pw;
+  screen.height = ph;
+  screen.style.width = innerWidth + "px";
+  screen.style.height = innerHeight + "px";
+  // Fractional scale (no floor) — smooth HD, not chunky integer pixel-doubling.
+  S = Math.min(pw / VIEW_W, ph / VIEW_H);
+  offX = (pw - VIEW_W * S) / 2;
+  offY = (ph - VIEW_H * S) / 2;
 }
 addEventListener("resize", onResize);
 onResize();
@@ -542,51 +757,87 @@ onResize();
 function drawParallax(cv, factor, cx) {
   let off = -((cx * factor) % LAYER_W);
   if (off > 0) off -= LAYER_W;
-  bctx.drawImage(cv, off, 0);
-  if (off + LAYER_W < VIEW_W) bctx.drawImage(cv, off + LAYER_W, 0);
+  sctx.drawImage(cv, off, 0, LAYER_W, VIEW_H);
+  if (off + LAYER_W < VIEW_W) sctx.drawImage(cv, off + LAYER_W, 0, LAYER_W, VIEW_H);
 }
 
+let playT = 0; // seconds of play — fades the control hint out after a few seconds
 function render(fps, dt) {
   const cx = Math.round(cam.x), cy = Math.round(cam.y);
+  playT += dt;
 
-  // sky + parallax silhouettes
-  bctx.drawImage(skyCv, 0, 0);
+  // letterbox bars
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.imageSmoothingEnabled = true;
+  sctx.imageSmoothingQuality = "high";
+  sctx.fillStyle = "#000";
+  sctx.fillRect(0, 0, screen.width, screen.height);
+
+  // Enter design space (fractional scale + letterbox offset), clipped to viewport.
+  sctx.setTransform(S, 0, 0, S, offX, offY);
+  sctx.save();
+  sctx.beginPath();
+  sctx.rect(0, 0, VIEW_W, VIEW_H);
+  sctx.clip();
+
+  // sky + parallax hills + mist — smooth (bilinear) upscale = painterly, not pixelated
+  sctx.drawImage(skyCv, 0, 0, VIEW_W, VIEW_H);
   drawParallax(layerFar, 0.25, cx);
+  drawParallax(mistCv, 0.35, cx);
   drawParallax(layerMid, 0.5, cx);
 
-  // tiles (visible slice of the baked room layer)
-  bctx.drawImage(tileCv, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
+  // tiles (visible slice of the baked room; baked at TILE_SS for foreground crispness)
+  sctx.drawImage(tileCv, cx * TILE_SS, cy * TILE_SS, VIEW_W * TILE_SS, VIEW_H * TILE_SS, 0, 0, VIEW_W, VIEW_H);
 
-  // Clawd — sprite is 16x12 around a 14x10 hitbox: 1px margin each side, feet aligned
+  // Clawd — sprite is 16x12 around a 14x10 hitbox. Kept crisp (nearest-neighbor)
+  // as a deliberate pixel mascot standing out against the smooth painterly world.
   const moving = Math.abs(player.vx) > 5;
-  const set = moving && player.grounded ? BAKED.scuttle : BAKED.idle;
-  const fps_ = moving && player.grounded ? TUNING.scuttleFps : TUNING.idleFps;
+  let set, fps_;
+  if (!player.grounded)  { set = BAKED.air;     fps_ = 1; }
+  else if (moving)       { set = BAKED.scuttle; fps_ = TUNING.scuttleFps; }
+  else                   { set = BAKED.idle;    fps_ = TUNING.idleFps; }
   const frame = set[((player.animTime * fps_) | 0) % set.length];
-  const img = player.facing < 0 ? frame.left : frame.right;
-  bctx.drawImage(img,
+  const expr = player.ouchT > 0 ? "ouch"
+    : player.idleT > THEME.face.happyAfter ? "happy"
+    : player.blinkT > 0 ? "blink" : "open";
+  const img = player.facing < 0 ? frame[expr].left : frame[expr].right;
+  sctx.imageSmoothingEnabled = false;
+  sctx.drawImage(img,
     Math.round(player.x - cx) - (SPR_W - player.w) / 2,
     Math.round(player.y - cy) - (SPR_H - player.h));
+  sctx.imageSmoothingEnabled = true;
 
-  // light motes (fireflies)
-  updateMotes(dt);
-  for (const m of motes) {
+  // falling leaves — filled shapes, anti-aliased edges (smooth)
+  updateLeaves(dt);
+  for (const m of leaves) {
     const x = m.x - cx, y = m.y - cy;
-    if (x < -4 || x > VIEW_W + 4 || y < -4 || y > VIEW_H + 4) continue;
-    const a = 0.22 + 0.32 * (Math.sin(m.ph * 2) + 1) / 2;
-    bctx.fillStyle = "rgba(" + m.col + "," + a.toFixed(2) + ")";
-    bctx.fillRect(Math.round(x), Math.round(y), m.r, m.r);
+    if (x < -6 || x > VIEW_W + 6 || y < -6 || y > VIEW_H + 6) continue;
+    sctx.save();
+    sctx.translate(x, y);
+    sctx.rotate(m.rot);
+    sctx.globalAlpha = m.a;
+    sctx.fillStyle = m.col;
+    sctx.beginPath();
+    sctx.ellipse(0, 0, 2.4, 1.2, 0, 0, 6.29);
+    sctx.fill();
+    sctx.restore();
   }
+  sctx.globalAlpha = 1;
 
-  // vignette
-  bctx.drawImage(vigCv, 0, 0);
+  // vignette / color grade
+  sctx.drawImage(vigCv, 0, 0, VIEW_W, VIEW_H);
+  sctx.restore(); // drop viewport clip
 
-  // debug overlay
+  // ---- HUD at native resolution (drawn after transform reset = razor sharp) ----
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  const PX = d => offX + d * S, PY = d => offY + d * S, PS = d => d * S;
+  sctx.textBaseline = "top";
+
   if (debugOn) {
-    bctx.fillStyle = "rgba(0,0,0,0.6)";
-    bctx.fillRect(2, 2, 178, 58);
-    bctx.fillStyle = "#7CFC9A";
-    bctx.font = "8px monospace";
-    bctx.textBaseline = "top";
+    sctx.fillStyle = "rgba(0,0,0,0.6)";
+    sctx.fillRect(PX(2), PY(2), PS(184), PS(60));
+    sctx.fillStyle = "#7CFC9A";
+    sctx.font = PS(8) + "px monospace";
     const L = [
       "pos  " + player.x.toFixed(1) + ", " + player.y.toFixed(1),
       "vel  " + player.vx.toFixed(1) + ", " + player.vy.toFixed(1),
@@ -594,19 +845,19 @@ function render(fps, dt) {
       "coyote " + (player.coyote * 1000).toFixed(0) + "ms  buffer " + (player.buffer * 1000).toFixed(0) + "ms",
       "fps " + fps.toFixed(0) + "  cam " + cam.x.toFixed(0) + "," + cam.y.toFixed(0),
     ];
-    for (let i = 0; i < L.length; i++) bctx.fillText(L[i], 6, 6 + i * 10);
+    for (let i = 0; i < L.length; i++) sctx.fillText(L[i], PX(6), PY(6 + i * 10));
   }
 
-  // hint
-  bctx.fillStyle = "rgba(230,245,240,0.35)";
-  bctx.font = "8px monospace";
-  bctx.textBaseline = "top";
-  bctx.fillText("arrows/AD move  space jump  R reset  ` debug", 122, VIEW_H - 12);
-
-  // blit to screen, letterboxed
-  sctx.fillStyle = "#000";
-  sctx.fillRect(0, 0, screen.width, screen.height);
-  sctx.drawImage(buffer, 0, 0, VIEW_W, VIEW_H, offX, offY, VIEW_W * scale, VIEW_H * scale);
+  // hint — native-res sans-serif, fades out after the first few seconds of play
+  const hintA = Math.max(0, Math.min(0.55, (6 - playT) * 0.6));
+  if (hintA > 0.002) {
+    sctx.fillStyle = "rgba(235,240,245," + hintA.toFixed(3) + ")";
+    sctx.font = "600 " + PS(8.5) + "px system-ui, -apple-system, sans-serif";
+    sctx.textAlign = "center";
+    sctx.fillText("arrows / A D  move        space  jump        R  reset        `  debug",
+      PX(VIEW_W / 2), PY(VIEW_H - 15));
+    sctx.textAlign = "left";
+  }
 }
 
 // ============================================================================
