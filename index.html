@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Clawdvania</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<canvas id="screen"></canvas>
+<script>
+"use strict";
+
+// ============================================================================
+// TUNING — every feel constant lives here. Tweak, refresh, replay.
+// Units: px, px/s, px/s^2, seconds (ms where named *Ms).
+// ============================================================================
+const TUNING = {
+  // Run
+  runMax: 140,            // px/s top ground speed
+  groundAccelTime: 0.10,  // s to reach runMax on ground
+  airControl: 0.75,       // fraction of ground accel while airborne
+  groundFriction: 1600,   // px/s^2 decel when no input on ground
+  airFriction: 350,       // px/s^2 decel when no input in air
+
+  // Jump (gravity + jump velocity are DERIVED from these two)
+  jumpApexTiles: 3.25,    // apex height in tiles
+  timeToApex: 0.32,       // s from takeoff to apex
+  fallGravityMult: 1.7,   // gravity multiplier while falling
+  jumpCutMult: 0.4,       // vy multiplier on jump release while rising
+  maxFallSpeed: 300,      // px/s fall cap (also anti-tunneling)
+
+  // Forgiveness — the stuff "feels good" is made of
+  coyoteMs: 100,          // grace after walking off a ledge
+  jumpBufferMs: 120,      // early jump press remembered before landing
+
+  // Player
+  hitboxW: 14,
+  hitboxH: 10,
+
+  // Camera
+  camLerp: 0.12,          // per-tick lerp factor toward focus (at 60Hz)
+  camDeadzoneX: 24,       // px half-width the focus can wander without pull
+  camDeadzoneY: 12,
+  camLookahead: 40,       // px shifted toward facing direction
+
+  // Sprite
+  idleFps: 3,             // idle breathe animation speed
+  scuttleFps: 10,         // scuttle animation speed
+};
+
+// ============================================================================
+// Constants (not feel — structure)
+// ============================================================================
+const VIEW_W = 480, VIEW_H = 270;
+const TILE = 16;
+const STEP = 1 / 60;
+
+// Derived jump physics: h = 1/2 g t^2  =>  g = 2h/t^2 ; v = g t = 2h/t
+const APEX_PX  = TUNING.jumpApexTiles * TILE;
+const GRAV_RISE = 2 * APEX_PX / (TUNING.timeToApex * TUNING.timeToApex);
+const JUMP_VEL  = 2 * APEX_PX / TUNING.timeToApex;
+
+// ============================================================================
+// Level — array of strings, 1 char per tile. '#' solid, '.' empty, 'P' spawn.
+// 90 wide x 17 tall. Human-writable, room-ready for Phase 2.
+// ============================================================================
+const LEVEL = [
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#........................................................................................#",
+  "#....................................................................................#####",
+  "#....................................#####...............................................#",
+  "#.............#####......................................................................#",
+  "#.................................###.........................####..............####.....#",
+  "#.....#####.................................##......###..................................#",
+  "#.............................####..........##.............##.............####...........#",
+  "#..P..........................####..........##.............##............................#",
+  "####################....######################....##################.....#################",
+  "####################....######################....##################.....#################",
+];
+
+// Parse level
+const ROOM_W = LEVEL[0].length * TILE;
+const ROOM_H = LEVEL.length * TILE;
+let SPAWN = { x: 3 * TILE, y: 13 * TILE };
+for (let r = 0; r < LEVEL.length; r++) {
+  if (LEVEL[r].length !== LEVEL[0].length) console.error("LEVEL row " + r + " has length " + LEVEL[r].length + ", expected " + LEVEL[0].length);
+  const c = LEVEL[r].indexOf("P");
+  if (c >= 0) SPAWN = { x: c * TILE + (TILE - TUNING.hitboxW) / 2, y: (r + 1) * TILE - TUNING.hitboxH };
+}
+
+function solidAt(px, py) {
+  if (px < 0 || px >= ROOM_W) return true;      // side walls
+  if (py < 0) return false;                     // open sky
+  if (py >= ROOM_H) return true;                // solid below room
+  const ch = LEVEL[(py / TILE) | 0][(px / TILE) | 0];
+  return ch === "#";
+}
+
+// ============================================================================
+// Clawd sprite — inline pixel arrays, zero asset files.
+// Palette: . transparent  d dark-coral  o coral  l light  w white  b black
+// Frames are drawn facing RIGHT; flipped at draw time when facing left.
+// ============================================================================
+const PALETTE = {
+  d: "#a94a2d",
+  o: "#d97757",  // Claude coral
+  l: "#f09b7d",
+  w: "#ffffff",
+  b: "#1d130e",
+};
+
+const SPR_W = 16, SPR_H = 12;
+
+const FRAMES = {
+  // idle: 2-frame breathe (body lifts one px)
+  idle: [
+    [
+      "...wb.....wb....",
+      "...db.....db....",
+      "....d.....d.....",
+      "..d.ooooooo.d...",
+      ".dd.ooollloo.dd.",
+      "dd.ooollllloo.dd",
+      "d.ooooollooooo.d",
+      "..oooooooooooo..",
+      "..dooooooooood..",
+      "...d.d.d..d.d...",
+      "..d..d..d.d..d..",
+      "................",
+    ],
+    [
+      "................",
+      "...wb.....wb....",
+      "...db.....db....",
+      "....d.....d.....",
+      "..d.ooooooo.d...",
+      ".ddooollllooodd.",
+      "dd.ooollllloo.dd",
+      "d.oooooooooooo.d",
+      "..dooooooooood..",
+      "...d.d.d..d.d...",
+      "..d..d..d.d..d..",
+      "................",
+    ],
+  ],
+  // scuttle: 3-frame leg cycle
+  scuttle: [
+    [
+      "...wb.....wb....",
+      "...db.....db....",
+      "....d.....d.....",
+      "..d.ooooooo.d...",
+      ".dd.ooollloo.dd.",
+      "dd.ooollllloo.dd",
+      "d.ooooollooooo.d",
+      "..oooooooooooo..",
+      "..dooooooooood..",
+      "...d..d...d..d..",
+      "..d....d.d....d.",
+      "................",
+    ],
+    [
+      "...wb.....wb....",
+      "...db.....db....",
+      "....d.....d.....",
+      "..d.ooooooo.d...",
+      ".dd.ooollloo.dd.",
+      "dd.ooollllloo.dd",
+      "d.ooooollooooo.d",
+      "..oooooooooooo..",
+      "..dooooooooood..",
+      "...dd..d.d..dd..",
+      "................",
+      "................",
+    ],
+    [
+      "...wb.....wb....",
+      "...db.....db....",
+      "....d.....d.....",
+      "..d.ooooooo.d...",
+      ".dd.ooollloo.dd.",
+      "dd.ooollllloo.dd",
+      "d.ooooollooooo.d",
+      "..oooooooooooo..",
+      "..dooooooooood..",
+      "..d..d.....d..d.",
+      ".d..d.......d..d",
+      "................",
+    ],
+  ],
+};
+
+// Pre-render every frame (and its mirror) to offscreen canvases at boot.
+function bakeFrame(rows, flip) {
+  const cv = document.createElement("canvas");
+  cv.width = SPR_W; cv.height = SPR_H;
+  const c = cv.getContext("2d");
+  const img = c.createImageData(SPR_W, SPR_H);
+  for (let y = 0; y < SPR_H; y++) {
+    const row = (rows[y] || "").padEnd(SPR_W, ".");
+    for (let x = 0; x < SPR_W; x++) {
+      const ch = row[flip ? SPR_W - 1 - x : x];
+      const hex = PALETTE[ch];
+      if (!hex) continue;
+      const i = (y * SPR_W + x) * 4;
+      img.data[i]     = parseInt(hex.slice(1, 3), 16);
+      img.data[i + 1] = parseInt(hex.slice(3, 5), 16);
+      img.data[i + 2] = parseInt(hex.slice(5, 7), 16);
+      img.data[i + 3] = 255;
+    }
+  }
+  c.putImageData(img, 0, 0);
+  return cv;
+}
+const BAKED = {};
+for (const name of Object.keys(FRAMES)) {
+  BAKED[name] = FRAMES[name].map(f => ({ right: bakeFrame(f, false), left: bakeFrame(f, true) }));
+}
+
+// ============================================================================
+// Input
+// ============================================================================
+const input = { left: false, right: false, jumpHeld: false, jumpPressed: false };
+let debugOn = false;
+
+const KEYMAP = {
+  ArrowLeft: "left", KeyA: "left",
+  ArrowRight: "right", KeyD: "right",
+  ArrowUp: "jump", KeyW: "jump", Space: "jump",
+};
+
+addEventListener("keydown", (e) => {
+  const act = KEYMAP[e.code];
+  if (act || e.code === "KeyR" || e.code === "Backquote") e.preventDefault();
+  if (e.repeat) return;
+  if (act === "left") input.left = true;
+  if (act === "right") input.right = true;
+  if (act === "jump") { input.jumpHeld = true; input.jumpPressed = true; }
+  if (e.code === "KeyR") resetPlayer();
+  if (e.code === "Backquote") debugOn = !debugOn; // spec says D, but D also moves right; ` is the no-conflict toggle
+});
+addEventListener("keyup", (e) => {
+  const act = KEYMAP[e.code];
+  if (act === "left") input.left = false;
+  if (act === "right") input.right = false;
+  if (act === "jump") input.jumpHeld = false;
+});
+
+// ============================================================================
+// Player
+// ============================================================================
+const player = {
+  x: 0, y: 0, vx: 0, vy: 0,
+  w: TUNING.hitboxW, h: TUNING.hitboxH,
+  grounded: false, facing: 1,
+  coyote: 0, buffer: 0, jumpCutDone: true,
+  animTime: 0,
+};
+
+function resetPlayer() {
+  player.x = SPAWN.x; player.y = SPAWN.y;
+  player.vx = 0; player.vy = 0;
+  player.grounded = false; player.facing = 1;
+  player.coyote = 0; player.buffer = 0; player.jumpCutDone = true;
+  cam.x = clamp(player.x + player.w / 2 - VIEW_W / 2, 0, ROOM_W - VIEW_W);
+  cam.y = clamp(player.y + player.h / 2 - VIEW_H / 2, 0, ROOM_H - VIEW_H);
+  cam.fx = player.x + player.w / 2;
+  cam.fy = player.y + player.h / 2;
+}
+
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+// Axis-separated AABB vs tile grid: move X, resolve, then Y, resolve.
+function moveAxis(axis, amount) {
+  if (axis === "x") player.x += amount; else player.y += amount;
+  const x0 = Math.floor(player.x), y0 = Math.floor(player.y);
+  const x1 = Math.ceil(player.x + player.w) - 1, y1 = Math.ceil(player.y + player.h) - 1;
+  const tx0 = Math.floor(x0 / TILE), tx1 = Math.floor(x1 / TILE);
+  const ty0 = Math.floor(y0 / TILE), ty1 = Math.floor(y1 / TILE);
+  let hit = false;
+  for (let ty = ty0; ty <= ty1; ty++) {
+    for (let tx = tx0; tx <= tx1; tx++) {
+      if (!solidAt(tx * TILE, ty * TILE)) continue;
+      hit = true;
+      if (axis === "x") {
+        if (amount > 0) player.x = tx * TILE - player.w;
+        else player.x = (tx + 1) * TILE;
+      } else {
+        if (amount > 0) { player.y = ty * TILE - player.h; player.grounded = true; }
+        else player.y = (ty + 1) * TILE;
+      }
+    }
+  }
+  return hit;
+}
+
+function updatePlayer(dt) {
+  const T = TUNING;
+
+  // --- timers ---
+  player.coyote = player.grounded ? T.coyoteMs / 1000 : Math.max(0, player.coyote - dt);
+  player.buffer = Math.max(0, player.buffer - dt);
+  if (input.jumpPressed) { player.buffer = T.jumpBufferMs / 1000; input.jumpPressed = false; }
+
+  // --- horizontal ---
+  const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  const accel = (T.runMax / T.groundAccelTime) * (player.grounded ? 1 : T.airControl);
+  if (dir !== 0) {
+    player.vx = clamp(player.vx + dir * accel * dt, -T.runMax, T.runMax);
+    player.facing = dir;
+  } else {
+    const fr = (player.grounded ? T.groundFriction : T.airFriction) * dt;
+    if (Math.abs(player.vx) <= fr) player.vx = 0;
+    else player.vx -= Math.sign(player.vx) * fr;
+  }
+
+  // --- jump ---
+  if (player.buffer > 0 && player.coyote > 0) {
+    player.vy = -JUMP_VEL;
+    player.grounded = false;
+    player.coyote = 0;
+    player.buffer = 0;
+    player.jumpCutDone = false;
+  }
+  // variable height: cut upward velocity once on release while rising
+  if (!input.jumpHeld && player.vy < 0 && !player.jumpCutDone) {
+    player.vy *= T.jumpCutMult;
+    player.jumpCutDone = true;
+  }
+
+  // --- gravity (asymmetric) ---
+  const g = player.vy < 0 ? GRAV_RISE : GRAV_RISE * T.fallGravityMult;
+  player.vy = Math.min(player.vy + g * dt, T.maxFallSpeed);
+
+  // --- move & collide ---
+  const wasGroundedMoveX = moveAxis("x", player.vx * dt);
+  if (wasGroundedMoveX) player.vx = 0;
+  player.grounded = false;
+  const hitY = moveAxis("y", player.vy * dt);
+  if (hitY) player.vy = 0;
+
+  // fell out of a pit? (shouldn't happen — floor is solid — but belt & braces)
+  if (player.y > ROOM_H + 64) resetPlayer();
+
+  // --- animation clock ---
+  player.animTime += dt;
+}
+
+// ============================================================================
+// Camera — lerp follow, deadzone, facing lookahead, clamped to room.
+// ============================================================================
+const cam = { x: 0, y: 0, fx: 0, fy: 0 }; // fx/fy = focus point
+
+function updateCamera() {
+  const T = TUNING;
+  const px = player.x + player.w / 2 + player.facing * T.camLookahead;
+  const py = player.y + player.h / 2;
+
+  // deadzone: focus only moves when the look point escapes the box
+  const dx = px - cam.fx;
+  if (dx > T.camDeadzoneX) cam.fx += dx - T.camDeadzoneX;
+  else if (dx < -T.camDeadzoneX) cam.fx += dx + T.camDeadzoneX;
+  const dy = py - cam.fy;
+  if (dy > T.camDeadzoneY) cam.fy += dy - T.camDeadzoneY;
+  else if (dy < -T.camDeadzoneY) cam.fy += dy + T.camDeadzoneY;
+
+  const targetX = clamp(cam.fx - VIEW_W / 2, 0, ROOM_W - VIEW_W);
+  const targetY = clamp(cam.fy - VIEW_H / 2, 0, ROOM_H - VIEW_H);
+  cam.x += (targetX - cam.x) * T.camLerp;
+  cam.y += (targetY - cam.y) * T.camLerp;
+  // clamp again so lerp overshoot can never show outside the room
+  cam.x = clamp(cam.x, 0, ROOM_W - VIEW_W);
+  cam.y = clamp(cam.y, 0, ROOM_H - VIEW_H);
+}
+
+// ============================================================================
+// THEME — Ori-inspired luminous forest. All procedural, zero assets.
+// Visual only; TUNING stays feel-only.
+// ============================================================================
+const THEME = {
+  skyStops: [[0, "#24406b"], [0.45, "#2f6b7e"], [0.8, "#4fa08f"], [1, "#66b89c"]],
+  sunPos: [150, 58], sunRadius: 270, sunColor: "255,240,205",
+  farColor: "#3a6b8c",
+  midColor: "#27506e",
+  tileBody: "#223c50", tileBodyAlt: "#26445a",
+  mossTop: "#7fd6a8", mossGlow: "#c9f7dd",
+  rim: "#3f7a8a", underShade: "#101d2c",
+  moteColors: ["255,233,168", "191,240,221"],
+  moteCount: 70,
+  vignette: 0.36,
+};
+
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeCanvas(w, h) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+
+// --- sky: gradient + sun glow + faint god rays (screen-space, baked once) ---
+const skyCv = makeCanvas(VIEW_W, VIEW_H);
+{
+  const c = skyCv.getContext("2d");
+  const gr = c.createLinearGradient(0, 0, 0, VIEW_H);
+  for (const [p, col] of THEME.skyStops) gr.addColorStop(p, col);
+  c.fillStyle = gr; c.fillRect(0, 0, VIEW_W, VIEW_H);
+  const [sx, sy] = THEME.sunPos;
+  const sun = c.createRadialGradient(sx, sy, 10, sx, sy, THEME.sunRadius);
+  sun.addColorStop(0, "rgba(" + THEME.sunColor + ",0.42)");
+  sun.addColorStop(1, "rgba(" + THEME.sunColor + ",0)");
+  c.fillStyle = sun; c.fillRect(0, 0, VIEW_W, VIEW_H);
+  c.fillStyle = "rgba(" + THEME.sunColor + ",0.07)";
+  for (const [dx, w] of [[-30, 26], [40, 40], [130, 30]]) {
+    c.beginPath();
+    c.moveTo(sx + dx, -10);
+    c.lineTo(sx + dx + w, -10);
+    c.lineTo(sx + dx + w + 150, VIEW_H + 10);
+    c.lineTo(sx + dx + 150 - w, VIEW_H + 10);
+    c.closePath(); c.fill();
+  }
+}
+
+// --- parallax silhouette layers (tileable strips, baked once) ---
+const LAYER_W = VIEW_W * 2;
+function makeHillLayer(color, baseY, amp, seed, trees) {
+  const cv = makeCanvas(LAYER_W, VIEW_H);
+  const c = cv.getContext("2d");
+  const rnd = mulberry32(seed);
+  const ph = [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28];
+  const yAt = (x) => baseY
+    + Math.sin((x / LAYER_W) * 2 * Math.PI + ph[0]) * amp
+    + Math.sin((x / LAYER_W) * 6 * Math.PI + ph[1]) * amp * 0.4
+    + Math.sin((x / LAYER_W) * 14 * Math.PI + ph[2]) * amp * 0.15;
+  c.fillStyle = color;
+  c.beginPath();
+  c.moveTo(0, VIEW_H);
+  for (let x = 0; x <= LAYER_W; x += 4) c.lineTo(x, yAt(x));
+  c.lineTo(LAYER_W, VIEW_H);
+  c.closePath(); c.fill();
+  for (let i = 0; i < trees; i++) {           // organic blob trees, wrap-safe
+    const tx = rnd() * LAYER_W, ty = yAt(tx) + 4, s = 7 + rnd() * 13;
+    for (const ox of [-LAYER_W, 0, LAYER_W]) {
+      c.fillRect(tx + ox - 1.5, ty - s * 1.6, 3, s * 1.6);
+      c.beginPath();
+      c.arc(tx + ox, ty - s * 1.7, s, 0, 6.29);
+      c.arc(tx + ox - s * 0.7, ty - s * 1.25, s * 0.7, 0, 6.29);
+      c.arc(tx + ox + s * 0.7, ty - s * 1.25, s * 0.7, 0, 6.29);
+      c.fill();
+    }
+  }
+  return cv;
+}
+const layerFar = makeHillLayer(THEME.farColor, 148, 26, 101, 6);
+const layerMid = makeHillLayer(THEME.midColor, 196, 34, 202, 12);
+
+// --- tile layer: whole room baked once (static in Phase 1) ---
+const tileCv = makeCanvas(ROOM_W, ROOM_H);
+{
+  const c = tileCv.getContext("2d");
+  for (let ty = 0; ty < LEVEL.length; ty++) {
+    for (let tx = 0; tx < LEVEL[0].length; tx++) {
+      if (LEVEL[ty][tx] !== "#") continue;
+      const x = tx * TILE, y = ty * TILE;
+      c.fillStyle = mulberry32(tx * 971 + ty * 331)() < 0.33 ? THEME.tileBodyAlt : THEME.tileBody;
+      c.fillRect(x, y, TILE, TILE);
+      if (!solidAt(x - TILE, y)) { c.fillStyle = THEME.rim; c.fillRect(x, y, 1, TILE); }
+      if (!solidAt(x + TILE, y)) { c.fillStyle = THEME.rim; c.fillRect(x + TILE - 1, y, 1, TILE); }
+      if (!solidAt(x, y + TILE)) { c.fillStyle = THEME.underShade; c.fillRect(x, y + TILE - 2, TILE, 2); }
+      if (!solidAt(x, y - TILE)) {
+        c.fillStyle = THEME.mossTop;  c.fillRect(x, y, TILE, 3);
+        c.fillStyle = THEME.mossGlow; c.fillRect(x, y, TILE, 1);
+      }
+    }
+  }
+}
+
+// --- vignette (baked once) ---
+const vigCv = makeCanvas(VIEW_W, VIEW_H);
+{
+  const c = vigCv.getContext("2d");
+  const g = c.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.45, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.62);
+  g.addColorStop(0, "rgba(8,14,30,0)");
+  g.addColorStop(1, "rgba(8,14,30," + THEME.vignette + ")");
+  c.fillStyle = g; c.fillRect(0, 0, VIEW_W, VIEW_H);
+}
+
+// --- drifting light motes (fireflies) — visual only, room-space ---
+const motes = [];
+{
+  const rnd = mulberry32(777);
+  for (let i = 0; i < THEME.moteCount; i++) motes.push({
+    x: rnd() * ROOM_W, y: rnd() * ROOM_H,
+    vx: 3 + rnd() * 6, ph: rnd() * 6.28, sp: 0.4 + rnd() * 0.9,
+    r: rnd() < 0.5 ? 1 : 2,
+    col: THEME.moteColors[(rnd() * THEME.moteColors.length) | 0],
+  });
+}
+function updateMotes(dt) {
+  for (const m of motes) {
+    m.ph += m.sp * dt;
+    m.x += m.vx * dt;
+    m.y += Math.sin(m.ph) * 4 * dt - 1.5 * dt;
+    if (m.x > ROOM_W) m.x -= ROOM_W;
+    if (m.y < -8) m.y = ROOM_H;
+  }
+}
+
+// ============================================================================
+// Rendering — internal 480x270 buffer, integer-scaled + letterboxed to window.
+// ============================================================================
+const buffer = document.createElement("canvas");
+buffer.width = VIEW_W; buffer.height = VIEW_H;
+const bctx = buffer.getContext("2d");
+
+const screen = document.getElementById("screen");
+const sctx = screen.getContext("2d");
+
+let scale = 1, offX = 0, offY = 0;
+function onResize() {
+  screen.width = innerWidth;
+  screen.height = innerHeight;
+  scale = Math.max(1, Math.floor(Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H)));
+  offX = Math.floor((innerWidth - VIEW_W * scale) / 2);
+  offY = Math.floor((innerHeight - VIEW_H * scale) / 2);
+  sctx.imageSmoothingEnabled = false;
+}
+addEventListener("resize", onResize);
+onResize();
+
+function drawParallax(cv, factor, cx) {
+  let off = -((cx * factor) % LAYER_W);
+  if (off > 0) off -= LAYER_W;
+  bctx.drawImage(cv, off, 0);
+  if (off + LAYER_W < VIEW_W) bctx.drawImage(cv, off + LAYER_W, 0);
+}
+
+function render(fps, dt) {
+  const cx = Math.round(cam.x), cy = Math.round(cam.y);
+
+  // sky + parallax silhouettes
+  bctx.drawImage(skyCv, 0, 0);
+  drawParallax(layerFar, 0.25, cx);
+  drawParallax(layerMid, 0.5, cx);
+
+  // tiles (visible slice of the baked room layer)
+  bctx.drawImage(tileCv, cx, cy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
+
+  // Clawd — sprite is 16x12 around a 14x10 hitbox: 1px margin each side, feet aligned
+  const moving = Math.abs(player.vx) > 5;
+  const set = moving && player.grounded ? BAKED.scuttle : BAKED.idle;
+  const fps_ = moving && player.grounded ? TUNING.scuttleFps : TUNING.idleFps;
+  const frame = set[((player.animTime * fps_) | 0) % set.length];
+  const img = player.facing < 0 ? frame.left : frame.right;
+  bctx.drawImage(img,
+    Math.round(player.x - cx) - (SPR_W - player.w) / 2,
+    Math.round(player.y - cy) - (SPR_H - player.h));
+
+  // light motes (fireflies)
+  updateMotes(dt);
+  for (const m of motes) {
+    const x = m.x - cx, y = m.y - cy;
+    if (x < -4 || x > VIEW_W + 4 || y < -4 || y > VIEW_H + 4) continue;
+    const a = 0.22 + 0.32 * (Math.sin(m.ph * 2) + 1) / 2;
+    bctx.fillStyle = "rgba(" + m.col + "," + a.toFixed(2) + ")";
+    bctx.fillRect(Math.round(x), Math.round(y), m.r, m.r);
+  }
+
+  // vignette
+  bctx.drawImage(vigCv, 0, 0);
+
+  // debug overlay
+  if (debugOn) {
+    bctx.fillStyle = "rgba(0,0,0,0.6)";
+    bctx.fillRect(2, 2, 178, 58);
+    bctx.fillStyle = "#7CFC9A";
+    bctx.font = "8px monospace";
+    bctx.textBaseline = "top";
+    const L = [
+      "pos  " + player.x.toFixed(1) + ", " + player.y.toFixed(1),
+      "vel  " + player.vx.toFixed(1) + ", " + player.vy.toFixed(1),
+      "grounded " + player.grounded + "  facing " + (player.facing > 0 ? "R" : "L"),
+      "coyote " + (player.coyote * 1000).toFixed(0) + "ms  buffer " + (player.buffer * 1000).toFixed(0) + "ms",
+      "fps " + fps.toFixed(0) + "  cam " + cam.x.toFixed(0) + "," + cam.y.toFixed(0),
+    ];
+    for (let i = 0; i < L.length; i++) bctx.fillText(L[i], 6, 6 + i * 10);
+  }
+
+  // hint
+  bctx.fillStyle = "rgba(230,245,240,0.35)";
+  bctx.font = "8px monospace";
+  bctx.textBaseline = "top";
+  bctx.fillText("arrows/AD move  space jump  R reset  ` debug", 122, VIEW_H - 12);
+
+  // blit to screen, letterboxed
+  sctx.fillStyle = "#000";
+  sctx.fillRect(0, 0, screen.width, screen.height);
+  sctx.drawImage(buffer, 0, 0, VIEW_W, VIEW_H, offX, offY, VIEW_W * scale, VIEW_H * scale);
+}
+
+// ============================================================================
+// Fixed-timestep loop (accumulator). Delta clamped; accumulator reset on
+// tab-visibility regain (Topple's tab-hidden desync bug — not repeating it).
+// ============================================================================
+let last = performance.now();
+let acc = 0;
+let fpsSmooth = 60;
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) { last = performance.now(); acc = 0; }
+});
+
+function frame(now) {
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.1) dt = 0.1;               // clamp huge deltas (tab switch, hitching)
+  if (dt > 0) fpsSmooth += (1 / dt - fpsSmooth) * 0.05;
+
+  acc += dt;
+  while (acc >= STEP) {
+    updatePlayer(STEP);
+    updateCamera();
+    acc -= STEP;
+  }
+  render(fpsSmooth, dt);
+  requestAnimationFrame(frame);
+}
+
+resetPlayer();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
