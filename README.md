@@ -15,6 +15,8 @@ A 2D browser metroidvania starring **Clawd**, the orange pixel-crab. Phase 1: a 
 | R | Reset to spawn |
 | ` (backtick) | Debug overlay (pos, vel, coyote/buffer timers, FPS) |
 
+**Mobile:** on-screen arrows + jump button appear automatically on touch devices (variable jump height works there too). The game plays in landscape — portrait shows a rotate prompt.
+
 ## Feel
 
 All movement constants live in the `TUNING` object at the top of `index.html`: run acceleration, jump apex/time, asymmetric gravity, variable jump height, **100ms coyote time**, **120ms jump buffer**, camera lerp/deadzone/lookahead. Fixed-timestep simulation at 60Hz.

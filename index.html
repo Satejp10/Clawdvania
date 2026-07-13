@@ -2,14 +2,56 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Clawdvania</title>
 <style>
-  html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
-  canvas { display: block; position: absolute; left: 0; top: 0; image-rendering: auto; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden;
+               overscroll-behavior: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; position: absolute; left: 0; top: 0; image-rendering: auto; touch-action: none; }
+
+  /* --- touch controls (shown only on coarse-pointer devices, see JS) --- */
+  #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 5;
+           font-family: system-ui, sans-serif; }
+  #touch.on { display: block; }
+  .tbtn {
+    position: absolute; pointer-events: auto; touch-action: none;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; border: 1.5px solid rgba(238,197,132,0.35);
+    background: radial-gradient(circle at 35% 30%, rgba(70,58,82,0.55), rgba(26,21,38,0.65));
+    color: rgba(238,197,132,0.85);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tbtn:active, .tbtn.held { background: radial-gradient(circle at 35% 30%, rgba(201,138,74,0.55), rgba(43,35,56,0.7));
+                             border-color: rgba(238,197,132,0.7); color: #ffe9c4; }
+  .tbtn svg { width: 46%; height: 46%; fill: currentColor; }
+  #tLeft  { left: max(4vw, env(safe-area-inset-left)); bottom: 6vh; width: 17vmin; height: 17vmin; }
+  #tRight { left: calc(max(4vw, env(safe-area-inset-left)) + 20vmin); bottom: 6vh; width: 17vmin; height: 17vmin; }
+  #tJump  { right: max(5vw, env(safe-area-inset-right)); bottom: 7vh; width: 21vmin; height: 21vmin; }
+
+  /* --- portrait "rotate your device" overlay (touch devices only) --- */
+  #rotate { display: none; position: fixed; inset: 0; z-index: 10;
+            background: linear-gradient(#31406b, #5d5a7e 55%, #a5776c 90%, #c99a6d);
+            color: #ffe9c4; text-align: center;
+            font-family: system-ui, sans-serif; }
+  #rotate .inner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+  #rotate .phone { font-size: 64px; display: inline-block; animation: tilt 1.6s ease-in-out infinite; }
+  @keyframes tilt { 0%, 25% { transform: rotate(0deg); } 60%, 100% { transform: rotate(90deg); } }
+  body.portrait-touch #rotate { display: block; }
 </style>
 </head>
 <body>
 <canvas id="screen"></canvas>
+<div id="touch">
+  <div class="tbtn" id="tLeft"><svg viewBox="0 0 24 24"><path d="M15.5 4.5 8 12l7.5 7.5 1.8-1.8L11.6 12l5.7-5.7z"/></svg></div>
+  <div class="tbtn" id="tRight"><svg viewBox="0 0 24 24"><path d="M8.5 4.5 16 12l-7.5 7.5-1.8-1.8L12.4 12 6.7 6.3z"/></svg></div>
+  <div class="tbtn" id="tJump"><svg viewBox="0 0 24 24"><path d="M12 4l6.5 6.5-1.8 1.8L13 8.6V20h-2V8.6l-3.7 3.7-1.8-1.8z"/></svg></div>
+</div>
+<div id="rotate"><div class="inner">
+  <div class="phone">📱</div>
+  <div style="margin-top:14px;font-size:18px;font-weight:600">Rotate your device</div>
+  <div style="margin-top:6px;font-size:13px;opacity:.75">Clawdvania plays in landscape</div>
+</div></div>
 <script>
 "use strict";
 
@@ -54,7 +96,7 @@ const TUNING = {
 // ============================================================================
 // Constants (not feel — structure)
 // ============================================================================
-const VIEW_W = 640, VIEW_H = 360;
+const VIEW_W = 512, VIEW_H = 288;   // design viewport (16:9). Smaller = more zoomed-in.
 const TILE = 16;
 const STEP = 1 / 60;
 
@@ -312,6 +354,45 @@ addEventListener("keyup", (e) => {
   if (act === "right") input.right = false;
   if (act === "jump") input.jumpHeld = false;
 });
+
+// --- touch controls (mobile) — pointer events for reliable multitouch ---
+// Buttons are always bound (cheap, testable); CSS visibility is gated on isTouch.
+const isTouch = matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
+
+const bindTouchBtn = (id, down, up) => {
+  const el = document.getElementById(id);
+  const press = (e) => { e.preventDefault(); el.classList.add("held"); down(); };
+  const release = (e) => { e.preventDefault(); el.classList.remove("held"); up(); };
+  el.addEventListener("pointerdown", press);
+  el.addEventListener("pointerup", release);
+  el.addEventListener("pointercancel", release);
+  el.addEventListener("pointerleave", release);
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+};
+bindTouchBtn("tLeft",  () => { input.left = true;  }, () => { input.left = false;  });
+bindTouchBtn("tRight", () => { input.right = true; }, () => { input.right = false; });
+bindTouchBtn("tJump",  () => { input.jumpHeld = true; input.jumpPressed = true; }, () => { input.jumpHeld = false; });
+
+if (isTouch) {
+  document.getElementById("touch").classList.add("on");
+
+  // landscape: overlay in portrait; try to lock orientation where allowed
+  // (lock needs fullscreen on most browsers — attempt on first tap, fail silently)
+  const updateOrient = () => {
+    document.body.classList.toggle("portrait-touch", innerHeight > innerWidth);
+  };
+  addEventListener("resize", updateOrient);
+  updateOrient();
+  let lockTried = false;
+  addEventListener("pointerdown", async () => {
+    if (lockTried) return;
+    lockTried = true;
+    try {
+      await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+      await window.screen.orientation.lock("landscape"); // window.screen — `screen` is shadowed by the canvas below
+    } catch (e) { /* not supported or denied — the rotate overlay covers it */ }
+  }, { once: false });
+}
 
 // ============================================================================
 // Player
@@ -849,7 +930,8 @@ function render(fps, dt) {
   }
 
   // hint — native-res sans-serif, fades out after the first few seconds of play
-  const hintA = Math.max(0, Math.min(0.55, (6 - playT) * 0.6));
+  // (skipped on touch devices — they have on-screen buttons instead)
+  const hintA = isTouch ? 0 : Math.max(0, Math.min(0.55, (6 - playT) * 0.6));
   if (hintA > 0.002) {
     sctx.fillStyle = "rgba(235,240,245," + hintA.toFixed(3) + ")";
     sctx.font = "600 " + PS(8.5) + "px system-ui, -apple-system, sans-serif";
