@@ -107,35 +107,36 @@ const JUMP_VEL  = 2 * APEX_PX / TUNING.timeToApex;
 
 // ============================================================================
 // Level — array of strings, 1 char per tile. '#' solid, '.' empty, 'P' spawn.
-// 90 wide x 17 tall. Human-writable, room-ready for Phase 2.
+// 112 wide x 26 tall. Cols 89-110: the homecoming meadow (cottage is drawn art,
+// not tiles). Row 16 cols 20-23: secret ledge. Perch at 85-88 is the vista bench.
 // ============================================================================
 const LEVEL = [
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#........................................................................................#",
-  "#....................................................................................#####",
-  "#....................................#####...............................................#",
-  "#.............#####......................................................................#",
-  "#.................................###.........................####..............####.....#",
-  "#.....#####.................................##......###..................................#",
-  "#.............................####..........##.............##.............####...........#",
-  "#..P..........................####..........##.............##............................#",
-  "####################....######################....##################.....#################",
-  "####################....######################....##################.....#################",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#..............................................................................................................#",
+  "#...................####.......................................................................................#",
+  "#....................................................................................####......................#",
+  "#....................................#####.....................................................................#",
+  "#.............#####............................................................................................#",
+  "#.................................###.........................####..............####...........................#",
+  "#.....#####.................................##......###........................................................#",
+  "#.............................####..........##.............##.............####.................................#",
+  "#..P..........................####..........##.............##..................................................#",
+  "####################....######################....##################.....#######################################",
+  "####################....######################....##################.....#######################################",
 ];
 
 // Parse level
@@ -327,6 +328,131 @@ for (const name of Object.keys(BODY)) {
 }
 
 // ============================================================================
+// Game state — title / play / ending. The walk ends at the cottage door.
+// ============================================================================
+const game = { state: "title", t: 0, endT: 0, ended: false, tfade: 0 };
+function startGame() {
+  initAudio();
+  if (game.state === "title") { game.state = "play"; playT = 0; }
+}
+
+// ============================================================================
+// Audio — all synthesized (WebAudio), zero asset files. M toggles mute.
+// Quiet Hollow-Knight bed (wind, footsteps), Ori swells at the moments.
+// ============================================================================
+const AU = { ctx: null, master: null, click: null, muted: false, ambT: 5, ready: false };
+function initAudio() {
+  if (AU.ctx) { if (AU.ctx.state === "suspended") AU.ctx.resume().catch(() => {}); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try {
+    AU.ctx = new AC();
+    AU.master = AU.ctx.createGain();
+    AU.master.gain.value = AU.muted ? 0 : 0.8;
+    AU.master.connect(AU.ctx.destination);
+    // wind bed: looped brownish noise through a soft lowpass, slow swell LFO
+    const len = 2 * AU.ctx.sampleRate;
+    const buf = AU.ctx.createBuffer(1, len, AU.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let lastS = 0;
+    for (let i = 0; i < len; i++) { lastS = (lastS + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = lastS * 3.5; }
+    const src = AU.ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const lp = AU.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420; lp.Q.value = 0.4;
+    const wg = AU.ctx.createGain(); wg.gain.value = 0.05;
+    const lfo = AU.ctx.createOscillator(); lfo.frequency.value = 0.07;
+    const lfoG = AU.ctx.createGain(); lfoG.gain.value = 0.025;
+    lfo.connect(lfoG); lfoG.connect(wg.gain);
+    src.connect(lp); lp.connect(wg); wg.connect(AU.master);
+    src.start(); lfo.start();
+    // short noise grain for footsteps
+    const cl = AU.ctx.createBuffer(1, (AU.ctx.sampleRate * 0.05) | 0, AU.ctx.sampleRate);
+    const cd = cl.getChannelData(0);
+    for (let i = 0; i < cd.length; i++) cd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / cd.length, 2);
+    AU.click = cl;
+    AU.ready = true;
+  } catch (e) { /* no audio; the game plays silent */ }
+}
+function toggleMute() {
+  AU.muted = !AU.muted;
+  if (AU.master) AU.master.gain.value = AU.muted ? 0 : 0.8;
+}
+function envG(t0, attack, peak, dur) {
+  const g = AU.ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(peak, t0 + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  g.connect(AU.master);
+  return g;
+}
+function pluck(freq, peak, dur, delay) {
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime + (delay || 0);
+  const o = AU.ctx.createOscillator(); o.type = "sine"; o.frequency.value = freq;
+  const o2 = AU.ctx.createOscillator(); o2.type = "sine"; o2.frequency.value = freq * 2;
+  o.connect(envG(t0, 0.005, peak, dur));
+  o2.connect(envG(t0, 0.005, peak * 0.25, dur * 0.6));
+  o.start(t0); o2.start(t0); o.stop(t0 + dur + 0.05); o2.stop(t0 + dur + 0.05);
+}
+const SCALE = [392, 440, 523.25, 587.33, 659.25, 784]; // G A C D E G pentatonic — no wrong notes
+function sndChime(n) {
+  if (!AU.ready) return;
+  const f = SCALE[(n - 1) % SCALE.length] * (n > SCALE.length ? 2 : 1);
+  pluck(f, 0.13, 0.8); pluck(f * 2, 0.04, 0.5, 0.04);
+}
+function sndJump() {
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  const o = AU.ctx.createOscillator(); o.type = "triangle";
+  o.frequency.setValueAtTime(240, t0);
+  o.frequency.exponentialRampToValueAtTime(430, t0 + 0.09);
+  o.connect(envG(t0, 0.008, 0.05, 0.14));
+  o.start(t0); o.stop(t0 + 0.2);
+}
+function sndLand(impact) {
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  const o = AU.ctx.createOscillator(); o.type = "sine";
+  o.frequency.setValueAtTime(130, t0);
+  o.frequency.exponentialRampToValueAtTime(65, t0 + 0.1);
+  o.connect(envG(t0, 0.004, Math.min(0.14, 0.03 + impact / 3000), 0.13));
+  o.start(t0); o.stop(t0 + 0.18);
+}
+function sndStep() {
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  const s = AU.ctx.createBufferSource(); s.buffer = AU.click;
+  const bp = AU.ctx.createBiquadFilter(); bp.type = "bandpass";
+  bp.frequency.value = 1500 + Math.random() * 1100; bp.Q.value = 3;
+  s.connect(bp); bp.connect(envG(t0, 0.002, 0.035, 0.05));
+  s.start(t0);
+}
+function sndSwell() {
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  for (const f of [220, 277.18, 329.63, 440]) {          // warm A-major pad
+    const o = AU.ctx.createOscillator(); o.type = "triangle"; o.frequency.value = f;
+    const o2 = AU.ctx.createOscillator(); o2.type = "triangle"; o2.frequency.value = f * 1.003;
+    const lp = AU.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 900;
+    const g = AU.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(0.035, t0 + 1.8);
+    g.gain.setValueAtTime(0.035, t0 + 3.2);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 6.5);
+    o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(AU.master);
+    o.start(t0); o2.start(t0); o.stop(t0 + 7); o2.stop(t0 + 7);
+  }
+  pluck(SCALE[2], 0.1, 1.2, 1.2); pluck(SCALE[4], 0.1, 1.2, 1.55); pluck(SCALE[5], 0.12, 1.8, 1.9);
+}
+function updateAmbient(dt, dusk) {
+  if (!AU.ready || game.state === "title") return;
+  AU.ambT -= dt;
+  if (AU.ambT <= 0) {
+    AU.ambT = 6 + Math.random() * 8;
+    pluck(SCALE[(Math.random() * SCALE.length) | 0] / 2, 0.03 + 0.015 * dusk, 2.2);
+  }
+}
+
+// ============================================================================
 // Input
 // ============================================================================
 const input = { left: false, right: false, jumpHeld: false, jumpPressed: false };
@@ -340,14 +466,17 @@ const KEYMAP = {
 
 addEventListener("keydown", (e) => {
   const act = KEYMAP[e.code];
-  if (act || e.code === "KeyR" || e.code === "Backquote") e.preventDefault();
+  if (act || e.code === "KeyR" || e.code === "Backquote" || e.code === "KeyM") e.preventDefault();
   if (e.repeat) return;
+  startGame(); // any key dismisses the title (and still performs its action)
   if (act === "left") input.left = true;
   if (act === "right") input.right = true;
   if (act === "jump") { input.jumpHeld = true; input.jumpPressed = true; }
   if (e.code === "KeyR") resetPlayer();
+  if (e.code === "KeyM") toggleMute();
   if (e.code === "Backquote") debugOn = !debugOn; // spec says D, but D also moves right; ` is the no-conflict toggle
 });
+addEventListener("pointerdown", startGame);
 addEventListener("keyup", (e) => {
   const act = KEYMAP[e.code];
   if (act === "left") input.left = false;
@@ -404,6 +533,14 @@ const player = {
   coyote: 0, buffer: 0, jumpCutDone: true,
   animTime: 0,
   fallT: 0, ouchT: 0, idleT: 0, blinkT: 0, blinkNext: 3,
+};
+
+// Render/audio event tracker — derived from physics transitions, never feeds back.
+const fx = {
+  prevVy: 0, prevGrounded: false,
+  landImpact: 0, jumped: false,       // consumed by render (dust, squash)
+  squash: 0, squashT: 0,
+  sitT: 0, kickT: 0, stepFrame: -1,
 };
 
 function resetPlayer() {
@@ -505,6 +642,37 @@ function updatePlayer(dt) {
   if (player.blinkNext <= 0) { player.blinkT = THEME.face.blinkLen; player.blinkNext = 2.5 + Math.random() * 2.5; }
   player.blinkT = Math.max(0, player.blinkT - dt);
 
+  // --- fx & game events (visual/audio only, derived from transitions) ---
+  if (player.grounded && !fx.prevGrounded && fx.prevVy > 60) {
+    fx.landImpact = Math.max(fx.landImpact, fx.prevVy);
+    sndLand(fx.prevVy);
+  }
+  if (player.vy < -JUMP_VEL * 0.8 && fx.prevVy >= -JUMP_VEL * 0.8) {
+    fx.jumped = true;
+    sndJump();
+  }
+  // bench sit: standing still on the vista stump
+  const onBench = player.grounded && dir === 0 && Math.abs(player.vx) < 5 &&
+    player.x + player.w / 2 > BENCH.x0 && player.x + player.w / 2 < BENCH.x1 &&
+    Math.abs(player.y + player.h - BENCH.feetY) < 1;
+  fx.sitT = onBench ? fx.sitT + dt : 0;
+  // arriving home: the walk ends at the cottage door
+  if (game.state === "play" && !game.ended && player.grounded &&
+      Math.abs(player.x + player.w / 2 - HOME.doorX) < 11) {
+    game.state = "ending"; game.ended = true; game.endT = 0;
+    let n = 0;
+    for (const w of wisps) {
+      if (w.state !== "orbit") continue;
+      w.state = "fly"; w.fx = w.x; w.fy = w.y; w.ft = 0; w.delay = 0.15 + n * 0.13;
+      w.tx = HOME.x + 6 + ((n + 1) * (HOME.w - 12)) / (wispCount + 1);
+      w.ty = HOME.eaveY - 5 - (n % 2) * 6;
+      n++;
+    }
+    sndSwell();
+  }
+  fx.prevVy = player.vy;
+  fx.prevGrounded = player.grounded;
+
   // --- animation clock ---
   player.animTime += dt;
 }
@@ -513,10 +681,12 @@ function updatePlayer(dt) {
 // Camera — lerp follow, deadzone, facing lookahead, clamped to room.
 // ============================================================================
 const cam = { x: 0, y: 0, fx: 0, fy: 0 }; // fx/fy = focus point
+let camBias = 0; // extra gaze toward the meadow while sitting on the bench (visual)
 
 function updateCamera() {
   const T = TUNING;
-  const px = player.x + player.w / 2 + player.facing * T.camLookahead;
+  camBias += ((fx.sitT > 0.8 ? 85 : 0) - camBias) * 0.02;
+  const px = player.x + player.w / 2 + player.facing * T.camLookahead + camBias;
   const py = player.y + player.h / 2;
 
   // deadzone: focus only moves when the look point escapes the box
@@ -679,6 +849,13 @@ const mistCv = makeCanvas(LAYER_W, VIEW_H);
   }
 }
 
+// --- home cottage + vista bench (playfield landmarks, design px) ---
+const HOME = {
+  x: 1616, w: 64, groundY: 384, doorX: 1648, eaveY: 338,
+  win: { x: 1622, y: 350, w: 12, h: 12 },
+};
+const BENCH = { x0: 1372, x1: 1398, feetY: 272, cx: 1385 }; // stump on the vista perch
+
 // --- tile layer: whole room baked once, smooth painterly earth + soft turf ---
 // Supersampled (TILE_SS) so thin foreground detail (blades, lit tip) stays crisp
 // once the design buffer is scaled up to the display.
@@ -765,6 +942,56 @@ const tileCv = makeCanvas(ROOM_W * TILE_SS, ROOM_H * TILE_SS);
       }
     }
   }
+
+  // --- the home cottage, baked into the room (window + glow drawn live) ---
+  {
+    const hx = HOME.x, gy = HOME.groundY, hw = HOME.w, top = gy - 48;
+    const bg = c.createLinearGradient(0, top, 0, gy);
+    bg.addColorStop(0, "#4a3e5c"); bg.addColorStop(1, "#352b46");
+    c.fillStyle = bg; c.fillRect(hx, top, hw, 48);              // body
+    c.fillStyle = "#5a4c6e";                                    // eave-lit top edge
+    c.fillRect(hx, top, hw, 2);
+    const roof = c.createLinearGradient(0, gy - 84, 0, HOME.eaveY);
+    roof.addColorStop(0, "#3d3252"); roof.addColorStop(1, "#2a2138");
+    c.fillStyle = roof;
+    c.beginPath();                                              // roof
+    c.moveTo(hx - 10, HOME.eaveY);
+    c.lineTo(hx + hw / 2, gy - 84);
+    c.lineTo(hx + hw + 10, HOME.eaveY);
+    c.lineTo(hx + hw + 10, HOME.eaveY + 3);
+    c.lineTo(hx - 10, HOME.eaveY + 3);
+    c.closePath(); c.fill();
+    c.fillStyle = "#2a2138";                                    // chimney
+    c.fillRect(hx + hw - 18, gy - 76, 7, 22);
+    c.fillStyle = "#241d30";                                    // door arch
+    c.beginPath();
+    c.moveTo(HOME.doorX - 9, gy);
+    c.lineTo(HOME.doorX - 9, gy - 18);
+    c.quadraticCurveTo(HOME.doorX, gy - 30, HOME.doorX + 9, gy - 18);
+    c.lineTo(HOME.doorX + 9, gy);
+    c.closePath(); c.fill();
+    c.fillStyle = "#2c2438";                                    // window frame (dark until the ending)
+    c.fillRect(HOME.win.x - 2, HOME.win.y - 2, HOME.win.w + 4, HOME.win.h + 4);
+    c.fillStyle = "#171224";
+    c.fillRect(HOME.win.x, HOME.win.y, HOME.win.w, HOME.win.h);
+    c.fillStyle = "#3d3252";                                    // step stone
+    c.fillRect(HOME.doorX - 12, gy - 2, 24, 2);
+  }
+
+  // --- vista bench: a mossy stump on the perch ---
+  {
+    const bx = BENCH.cx, by = BENCH.feetY;
+    const tg = c.createLinearGradient(0, by - 7, 0, by);
+    tg.addColorStop(0, "#5c4a55"); tg.addColorStop(1, "#3a2f42");
+    c.fillStyle = tg;
+    c.beginPath();
+    c.roundRect(bx - 9, by - 7, 18, 7, 2);
+    c.fill();
+    c.fillStyle = THEME.grass;                                  // moss cap
+    c.fillRect(bx - 9, by - 7, 18, 2);
+    c.fillStyle = THEME.grassGlow;
+    c.fillRect(bx - 9, by - 7, 18, 1);
+  }
 }
 
 // --- color grade + vignette (baked once) ---
@@ -779,6 +1006,61 @@ const vigCv = makeCanvas(VIEW_W, VIEW_H);
   g.addColorStop(0, "rgba(10,12,26,0)");
   g.addColorStop(1, "rgba(10,12,26," + THEME.vignette + ")");
   c.fillStyle = g; c.fillRect(0, 0, VIEW_W, VIEW_H);
+}
+
+// --- star field: fades in as dusk deepens (screen-space, baked once) ---
+const starCv = makeCanvas(VIEW_W, VIEW_H);
+{
+  const c = starCv.getContext("2d");
+  const rnd = mulberry32(4242);
+  for (let i = 0; i < 70; i++) {
+    const x = rnd() * VIEW_W, y = rnd() * VIEW_H * 0.62;
+    const r = rnd() < 0.8 ? 0.6 : 1.1;
+    c.globalAlpha = 0.35 + rnd() * 0.6;
+    c.fillStyle = rnd() < 0.15 ? "#ffe9c4" : "#dfe6ff";
+    c.beginPath(); c.arc(x, y, r, 0, 6.29); c.fill();
+  }
+}
+
+// --- foreground silhouette layer: dark branches + grass tufts, parallax > 1 ---
+const layerFg = makeCanvas(LAYER_W, VIEW_H);
+{
+  const c = layerFg.getContext("2d");
+  const rnd = mulberry32(909);
+  c.fillStyle = "#141020";
+  c.strokeStyle = "#141020";
+  c.lineCap = "round";
+  // slender branches dipping in from the top edge, dressed with leaf clusters
+  for (let i = 0; i < 3; i++) {
+    const bx = rnd() * LAYER_W, bw = 70 + rnd() * 60, dip = 10 + rnd() * 10;
+    const dir = rnd() < 0.5 ? -1 : 1;
+    for (const ox of [-LAYER_W, 0, LAYER_W]) {
+      c.lineWidth = 2.5;
+      c.beginPath();
+      c.moveTo(bx + ox, -3);
+      c.quadraticCurveTo(bx + ox + dir * bw * 0.5, dip, bx + ox + dir * bw, dip * 0.6);
+      c.stroke();
+      for (let k = 0; k < 7; k++) {                    // leaf clusters along the branch
+        const t = 0.25 + rnd() * 0.75;
+        const lx = bx + ox + dir * bw * t;
+        const ly = dip * (1 - Math.abs(t - 0.55)) + rnd() * 3;
+        c.beginPath();
+        c.ellipse(lx, ly, 3 + rnd() * 3, 1.6 + rnd() * 1.6, rnd() * 3, 0, 6.29);
+        c.fill();
+      }
+    }
+  }
+  // grass tufts along the bottom edge (kept short so they never hide the player)
+  for (let i = 0; i < 46; i++) {
+    const gx = rnd() * LAYER_W, h = 5 + rnd() * 9, lean = (rnd() - 0.5) * 6;
+    for (const ox of [-LAYER_W, 0, LAYER_W]) {
+      c.beginPath();
+      c.moveTo(gx + ox - 2, VIEW_H + 1);
+      c.quadraticCurveTo(gx + ox + lean, VIEW_H - h, gx + ox + lean * 1.4, VIEW_H - h - 2);
+      c.quadraticCurveTo(gx + ox + lean + 2, VIEW_H - h * 0.5, gx + ox + 2, VIEW_H + 1);
+      c.closePath(); c.fill();
+    }
+  }
 }
 
 // --- falling leaves — visual only, room-space ---
@@ -802,6 +1084,74 @@ function updateLeaves(dt) {
     if (m.y > ROOM_H + 8) { m.y = -8; m.x = Math.random() * ROOM_W; }
     if (m.x < -8) m.x += ROOM_W;
     if (m.x > ROOM_W + 8) m.x -= ROOM_W;
+  }
+}
+
+// ============================================================================
+// Wisps — gentle collectibles that orbit Clawd and follow him home.
+// idle (bobbing in place) -> orbit (collected) -> fly -> lantern (at the eave).
+// ============================================================================
+const WISP_SPOTS = [           // design px centers; last two live on the secret ledge
+  [200, 368], [136, 323], [256, 291], [349, 344],
+  [624, 275], [712, 320], [765, 357], [1016, 307],
+  [1128, 352], [1408, 253],
+  [336, 240], [365, 243],
+];
+const wisps = WISP_SPOTS.map(([x, y], i) => ({
+  x, y, hx: x, hy: y, state: "idle", i, t: Math.random() * 6.28,
+  tx: 0, ty: 0, fx: 0, fy: 0, ft: 0, delay: 0,
+}));
+let wispCount = 0;
+
+function updateWisps(dt) {
+  const pcx = player.x + player.w / 2, pcy = player.y + player.h / 2 - 2;
+  for (const w of wisps) {
+    w.t += dt;
+    if (w.state === "idle") {
+      w.x = w.hx + Math.sin(w.t * 1.3) * 3;
+      w.y = w.hy + Math.sin(w.t * 2.1) * 4;
+      const dx = w.x - pcx, dy = w.y - pcy;
+      if (game.state !== "title" && dx * dx + dy * dy < 15 * 15) {
+        w.state = "orbit";
+        wispCount++;
+        sndChime(wispCount);
+      }
+    } else if (w.state === "orbit") {
+      const ang = w.t * 1.6 + w.i * 2.4;
+      const r = 13 + (w.i % 3) * 4;
+      w.x += (pcx + Math.cos(ang) * r - w.x) * Math.min(1, dt * 6);
+      w.y += (pcy + Math.sin(ang) * r * 0.6 - 6 - w.y) * Math.min(1, dt * 6);
+    } else if (w.state === "fly") {
+      w.delay -= dt;
+      if (w.delay <= 0) {
+        w.ft = Math.min(1, w.ft + dt / 1.4);
+        const e = 1 - Math.pow(1 - w.ft, 3);
+        w.x = w.fx + (w.tx - w.fx) * e;
+        w.y = w.fy + (w.ty - w.fy) * e - Math.sin(e * Math.PI) * 24;
+        if (w.ft >= 1) w.state = "lantern";
+      }
+    } else {                    // lantern: settled at the cottage eave
+      w.x = w.tx + Math.sin(w.t * 1.2 + w.i) * 1.5;
+      w.y = w.ty + Math.sin(w.t * 1.7 + w.i) * 1.5;
+    }
+  }
+}
+
+// ============================================================================
+// Particles — dust puffs, grass flecks. Visual only, room-space.
+// ============================================================================
+const parts = [];
+function spawnPart(x, y, vx, vy, life, size, col, a) {
+  if (parts.length < 200) parts.push({ x, y, vx, vy, life, tot: life, size, col, a });
+}
+function updateParts(dt) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.life -= dt;
+    if (p.life <= 0) { parts.splice(i, 1); continue; }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 130 * dt;
   }
 }
 
@@ -845,7 +1195,13 @@ function drawParallax(cv, factor, cx) {
 let playT = 0; // seconds of play — fades the control hint out after a few seconds
 function render(fps, dt) {
   const cx = Math.round(cam.x), cy = Math.round(cam.y);
-  playT += dt;
+  game.t += dt;
+  if (game.state !== "title") playT += dt;
+  if (game.state !== "title" && game.tfade < 1) game.tfade = Math.min(1, game.tfade + dt / 0.7);
+  if (game.ended) game.endT += dt;
+  // dusk deepens as the camera travels toward home (0 at spawn, 1 at the cottage)
+  const duskD = clamp((cx + VIEW_W / 2 - 260) / 1200, 0, 1);
+  updateAmbient(dt, duskD);
 
   // letterbox bars
   sctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -863,12 +1219,38 @@ function render(fps, dt) {
 
   // sky + parallax hills + mist — smooth (bilinear) upscale = painterly, not pixelated
   sctx.drawImage(skyCv, 0, 0, VIEW_W, VIEW_H);
+  if (duskD > 0.35) {                       // first stars as the dusk deepens
+    sctx.globalAlpha = Math.pow((duskD - 0.35) / 0.65, 1.6) * 0.9;
+    sctx.drawImage(starCv, 0, 0, VIEW_W, VIEW_H);
+    sctx.globalAlpha = 1;
+  }
   drawParallax(layerFar, 0.25, cx);
   drawParallax(mistCv, 0.35, cx);
   drawParallax(layerMid, 0.5, cx);
 
   // tiles (visible slice of the baked room; baked at TILE_SS for foreground crispness)
   sctx.drawImage(tileCv, cx * TILE_SS, cy * TILE_SS, VIEW_W * TILE_SS, VIEW_H * TILE_SS, 0, 0, VIEW_W, VIEW_H);
+
+  // the cottage window lights up when you make it home
+  if (game.ended) {
+    const lit = Math.min(1, game.endT / 1.3);
+    const wx = HOME.win.x - cx, wy = HOME.win.y - cy;
+    if (wx > -80 && wx < VIEW_W + 80) {
+      sctx.fillStyle = "rgba(255,217,138," + (0.95 * lit).toFixed(3) + ")";
+      sctx.fillRect(wx, wy, HOME.win.w, HOME.win.h);
+      sctx.fillStyle = "rgba(24,17,10," + (0.85 * lit).toFixed(3) + ")";
+      sctx.fillRect(wx + HOME.win.w / 2 - 0.5, wy, 1, HOME.win.h);   // muntins
+      sctx.fillRect(wx, wy + HOME.win.h / 2 - 0.5, HOME.win.w, 1);
+      sctx.save();
+      sctx.globalCompositeOperation = "lighter";
+      const hg = sctx.createRadialGradient(wx + 6, wy + 6, 2, wx + 6, wy + 6, 44);
+      hg.addColorStop(0, "rgba(255,200,120," + (0.35 * lit).toFixed(3) + ")");
+      hg.addColorStop(1, "rgba(255,200,120,0)");
+      sctx.fillStyle = hg;
+      sctx.fillRect(wx - 44, wy - 44, 100, 100);
+      sctx.restore();
+    }
+  }
 
   // Clawd — sprite is 16x12 around a 14x10 hitbox. Kept crisp (nearest-neighbor)
   // as a deliberate pixel mascot standing out against the smooth painterly world.
@@ -877,16 +1259,106 @@ function render(fps, dt) {
   if (!player.grounded)  { set = BAKED.air;     fps_ = 1; }
   else if (moving)       { set = BAKED.scuttle; fps_ = TUNING.scuttleFps; }
   else                   { set = BAKED.idle;    fps_ = TUNING.idleFps; }
-  const frame = set[((player.animTime * fps_) | 0) % set.length];
+  const frameIdx = ((player.animTime * fps_) | 0) % set.length;
+  const frame = set[frameIdx];
+  if (set === BAKED.scuttle) {                 // footstep ticks on frame changes
+    if (frameIdx !== fx.stepFrame) { fx.stepFrame = frameIdx; sndStep(); }
+  } else fx.stepFrame = -1;
   const expr = player.ouchT > 0 ? "ouch"
+    : (game.ended && game.endT < 7) ? "happy"
+    : fx.sitT > 1.5 ? "happy"
     : player.idleT > THEME.face.happyAfter ? "happy"
     : player.blinkT > 0 ? "blink" : "open";
   const img = player.facing < 0 ? frame[expr].left : frame[expr].right;
+
+  const footX = Math.round(player.x - cx) + player.w / 2;
+  const footY = Math.round(player.y - cy) + player.h;
+
+  // lantern glow: Clawd carries the light as the dusk deepens
+  const glowA = duskD * (0.10 + 0.045 * Math.min(10, wispCount));
+  if (glowA > 0.015) {
+    sctx.save();
+    sctx.globalCompositeOperation = "lighter";
+    const gr = sctx.createRadialGradient(footX, footY - 6, 2, footX, footY - 6, 26 + wispCount * 2);
+    gr.addColorStop(0, "rgba(255,214,150," + glowA.toFixed(3) + ")");
+    gr.addColorStop(1, "rgba(255,214,150,0)");
+    sctx.fillStyle = gr;
+    sctx.fillRect(footX - 60, footY - 66, 120, 120);
+    sctx.restore();
+  }
+
+  // squash & stretch (render-only): impact dip on landing, lengthen at speed in air
+  if (fx.landImpact > 0) {
+    fx.squash = Math.min(0.3, fx.landImpact / 900);
+    fx.squashT = 0.16;
+    const n = 3 + Math.min(6, (fx.landImpact / 60) | 0);
+    for (let i = 0; i < n; i++)
+      spawnPart(player.x + player.w / 2 + (Math.random() - 0.5) * 10, player.y + player.h,
+        (Math.random() - 0.5) * 70, -(10 + Math.random() * 40),
+        0.3 + Math.random() * 0.15, 1 + Math.random() * 1.5, THEME.mist.tint, 0.5);
+    fx.landImpact = 0;
+  }
+  if (fx.jumped) {
+    for (let i = 0; i < 3; i++)
+      spawnPart(player.x + player.w / 2 + (Math.random() - 0.5) * 8, player.y + player.h,
+        (Math.random() - 0.5) * 50, 10 + Math.random() * 20,
+        0.25, 1 + Math.random(), THEME.mist.tint, 0.4);
+    fx.jumped = false;
+  }
+  fx.kickT -= dt;
+  if (player.grounded && Math.abs(player.vx) > 110 && fx.kickT <= 0) {   // grass flecks
+    fx.kickT = 0.12;
+    spawnPart(player.x + (player.vx > 0 ? 0 : player.w), player.y + player.h - 1,
+      -Math.sign(player.vx) * (20 + Math.random() * 30), -(20 + Math.random() * 30),
+      0.4, 1.2, Math.random() < 0.4 ? THEME.grassGlow : THEME.grass, 0.7);
+  }
+  let sclX = 1, sclY = 1;
+  if (fx.squashT > 0) {
+    const k = Math.sin((fx.squashT / 0.16) * Math.PI);
+    sclY = 1 - fx.squash * k;
+    sclX = 1 + fx.squash * 0.9 * k;
+    fx.squashT -= dt;
+  } else if (!player.grounded && Math.abs(player.vy) > 140) {
+    const st = Math.min(0.16, (Math.abs(player.vy) - 140) / 1100);
+    sclY = 1 + st;
+    sclX = 1 - st * 0.7;
+  }
   sctx.imageSmoothingEnabled = false;
-  sctx.drawImage(img,
-    Math.round(player.x - cx) - (SPR_W - player.w) / 2,
-    Math.round(player.y - cy) - (SPR_H - player.h));
+  sctx.save();
+  sctx.translate(footX, footY);
+  sctx.scale(sclX, sclY);
+  sctx.drawImage(img, -SPR_W / 2, -SPR_H);
+  sctx.restore();
   sctx.imageSmoothingEnabled = true;
+
+  // wisps (drawn over Clawd so orbiters pass in front)
+  updateWisps(dt);
+  for (const w of wisps) {
+    const x = w.x - cx, y = w.y - cy;
+    if (x < -12 || x > VIEW_W + 12 || y < -12 || y > VIEW_H + 12) continue;
+    const pulse = 0.6 + 0.4 * Math.sin(w.t * 3);
+    sctx.save();
+    sctx.globalCompositeOperation = "lighter";
+    const g = sctx.createRadialGradient(x, y, 0.5, x, y, 7);
+    g.addColorStop(0, "rgba(255,230,170," + (0.8 * pulse).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(255,200,120,0)");
+    sctx.fillStyle = g;
+    sctx.fillRect(x - 8, y - 8, 16, 16);
+    sctx.fillStyle = "rgba(255,245,220," + pulse.toFixed(3) + ")";
+    sctx.beginPath(); sctx.arc(x, y, 1.3, 0, 6.29); sctx.fill();
+    sctx.restore();
+  }
+
+  // particles (dust, grass flecks)
+  updateParts(dt);
+  for (const p of parts) {
+    const x = p.x - cx, y = p.y - cy;
+    if (x < -6 || x > VIEW_W + 6 || y < -6 || y > VIEW_H + 6) continue;
+    sctx.globalAlpha = p.a * (p.life / p.tot);
+    sctx.fillStyle = p.col;
+    sctx.beginPath(); sctx.arc(x, y, p.size, 0, 6.29); sctx.fill();
+  }
+  sctx.globalAlpha = 1;
 
   // falling leaves — filled shapes, anti-aliased edges (smooth)
   updateLeaves(dt);
@@ -904,6 +1376,15 @@ function render(fps, dt) {
     sctx.restore();
   }
   sctx.globalAlpha = 1;
+
+  // dusk deepening: the world settles into night as you near home
+  if (duskD > 0.02) {
+    sctx.fillStyle = "rgba(16,13,42," + (0.34 * duskD).toFixed(3) + ")";
+    sctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
+
+  // foreground silhouettes (branches above, grass below) — closest parallax layer
+  drawParallax(layerFg, 1.5, cx);
 
   // vignette / color grade
   sctx.drawImage(vigCv, 0, 0, VIEW_W, VIEW_H);
@@ -931,14 +1412,68 @@ function render(fps, dt) {
 
   // hint — native-res sans-serif, fades out after the first few seconds of play
   // (skipped on touch devices — they have on-screen buttons instead)
-  const hintA = isTouch ? 0 : Math.max(0, Math.min(0.55, (6 - playT) * 0.6));
+  const hintA = (isTouch || game.state === "title") ? 0 : Math.max(0, Math.min(0.55, (6 - playT) * 0.6));
   if (hintA > 0.002) {
     sctx.fillStyle = "rgba(235,240,245," + hintA.toFixed(3) + ")";
     sctx.font = "600 " + PS(8.5) + "px system-ui, -apple-system, sans-serif";
     sctx.textAlign = "center";
-    sctx.fillText("arrows / A D  move        space  jump        R  reset        `  debug",
+    sctx.fillText("arrows / A D  move      space  jump      R  reset      M  mute      `  debug",
       PX(VIEW_W / 2), PY(VIEW_H - 15));
     sctx.textAlign = "left";
+  }
+
+  // wisp counter — quiet, top-right, only once you've met one
+  if (wispCount > 0) {
+    const wcx = PX(VIEW_W - 24), wcy = PY(12);
+    sctx.globalAlpha = 0.6;
+    const g = sctx.createRadialGradient(wcx, wcy, 0.5, wcx, wcy, PS(5));
+    g.addColorStop(0, "rgba(255,230,170,0.9)");
+    g.addColorStop(1, "rgba(255,200,120,0)");
+    sctx.fillStyle = g;
+    sctx.fillRect(wcx - PS(5), wcy - PS(5), PS(10), PS(10));
+    sctx.fillStyle = "#ffe9c4";
+    sctx.font = "600 " + PS(8) + "px system-ui, sans-serif";
+    sctx.textAlign = "left";
+    sctx.fillText(String(wispCount), wcx + PS(7), wcy - PS(4));
+    sctx.globalAlpha = 1;
+  }
+
+  // title card — fades away on the first input
+  const titleA = 1 - game.tfade;
+  if (titleA > 0.002) {
+    sctx.fillStyle = "rgba(10,8,22," + (0.32 * titleA).toFixed(3) + ")";
+    sctx.fillRect(offX, offY, VIEW_W * S, VIEW_H * S);
+    sctx.textAlign = "center";
+    sctx.fillStyle = "rgba(255,233,196," + (0.95 * titleA).toFixed(3) + ")";
+    sctx.font = "700 " + PS(27) + "px Georgia, 'Times New Roman', serif";
+    sctx.fillText("Clawdvania", PX(VIEW_W / 2), PY(96));
+    sctx.fillStyle = "rgba(235,240,245," + (0.65 * titleA).toFixed(3) + ")";
+    sctx.font = "italic " + PS(10) + "px Georgia, serif";
+    sctx.fillText("a walk home at dusk", PX(VIEW_W / 2), PY(132));
+    const pulse = 0.45 + 0.3 * Math.sin(game.t * 2.2);
+    sctx.fillStyle = "rgba(235,240,245," + (pulse * titleA).toFixed(3) + ")";
+    sctx.font = "600 " + PS(8.5) + "px system-ui, sans-serif";
+    sctx.fillText(isTouch ? "tap to begin" : "press any key to begin", PX(VIEW_W / 2), PY(170));
+    sctx.textAlign = "left";
+  }
+
+  // end card — welcome home
+  if (game.ended) {
+    const a = Math.min(1, Math.max(0, (game.endT - 2.2) / 1)) *
+              (1 - Math.min(1, Math.max(0, (game.endT - 8.5) / 1.5)));
+    if (a > 0.002) {
+      sctx.textAlign = "center";
+      sctx.fillStyle = "rgba(255,233,196," + (0.9 * a).toFixed(3) + ")";
+      sctx.font = "700 " + PS(17) + "px Georgia, 'Times New Roman', serif";
+      sctx.fillText("welcome home", PX(VIEW_W / 2), PY(92));
+      const sub = wispCount >= 12 ? "every last wisp came home with you"
+        : wispCount > 0 ? wispCount + (wispCount === 1 ? " wisp" : " wisps") + " followed you home"
+        : "the dusk walked you home";
+      sctx.fillStyle = "rgba(235,240,245," + (0.6 * a).toFixed(3) + ")";
+      sctx.font = "italic " + PS(9) + "px Georgia, serif";
+      sctx.fillText(sub, PX(VIEW_W / 2), PY(118));
+      sctx.textAlign = "left";
+    }
   }
 }
 
