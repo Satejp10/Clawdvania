@@ -12,9 +12,18 @@
 |---|---|
 | Arrows / A D | Move |
 | Space / W / Up | Jump (tap = short hop, hold = full jump) |
+| Hold direction into a wall | **Cling** — hang on, slide slowly |
+| Jump while clinging | Kick off the wall |
 | R | Reset to spawn |
 | M | Mute audio |
-| ` (backtick) | Debug overlay (pos, vel, coyote/buffer timers, FPS) |
+| ` (backtick) | Debug overlay (pos, vel, coyote/buffer/wall timers, FPS) |
+
+**Clinging** works like Hollow Knight's Mantis Claw: in the air, hold the direction *into* a
+wall and Clawd hooks on and slides down slowly. Keep holding to stay on — let go of that
+direction and he drops. Jump while hanging and he kicks off the other way; hold the direction
+again on the way back and you can work your way up a wall a kick at a time. He only grabs on
+the way *down*, so jumping straight up a wall you're already pressed against gives you the
+full jump rather than sticking you to it.
 
 There are **12 wisps** on the way home. Two are somewhere you'd only look if you were curious. Standing still in the right spot opens a view.
 
@@ -22,7 +31,9 @@ There are **12 wisps** on the way home. Two are somewhere you'd only look if you
 
 ## Feel
 
-All movement constants live in the `TUNING` object at the top of `index.html`: run acceleration, jump apex/time, asymmetric gravity, variable jump height, **100ms coyote time**, **120ms jump buffer**, camera lerp/deadzone/lookahead. Fixed-timestep simulation at 60Hz.
+All movement constants live in the `TUNING` object at the top of `index.html`: run acceleration, jump apex/time, asymmetric gravity, variable jump height, **100ms coyote time**, **120ms jump buffer**, camera lerp/deadzone/lookahead. The cling has its own block — slide speed, kick-off push, a **130ms** input lock after a kick-off so you actually clear the wall, and **90ms of wall coyote** so sliding past the end of a wall doesn't cost you the jump. Fixed-timestep simulation at 60Hz.
+
+The gaps in the ground are **ditches, not pits** — they bottom out in earth two tiles down. Step in and hop out, or cling your way up the side.
 
 ## Status
 

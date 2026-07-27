@@ -74,6 +74,14 @@ const TUNING = {
   jumpCutMult: 0.4,       // vy multiplier on jump release while rising
   maxFallSpeed: 300,      // px/s fall cap (also anti-tunneling)
 
+  // Wall cling — hold the direction INTO the wall to hang on (Mantis Claw style).
+  // Let go of that direction and Clawd drops; tap jump and he kicks off.
+  wallSlideSpeed: 40,     // px/s the cling slides down at
+  wallJumpMult: 0.98,     // fraction of JUMP_VEL on a kick-off
+  wallJumpVx: 155,        // px/s pushed away from the wall
+  wallLockMs: 130,        // horizontal input ignored after a kick-off, so you clear the wall
+  wallCoyoteMs: 90,       // grace to still kick off just after sliding past the wall's end
+
   // Forgiveness — the stuff "feels good" is made of
   coyoteMs: 100,          // grace after walking off a ledge
   jumpBufferMs: 120,      // early jump press remembered before landing
@@ -107,8 +115,11 @@ const JUMP_VEL  = 2 * APEX_PX / TUNING.timeToApex;
 
 // ============================================================================
 // Level — array of strings, 1 char per tile. '#' solid, '.' empty, 'P' spawn.
-// 112 wide x 26 tall. Cols 89-110: the homecoming meadow (cottage is drawn art,
+// 112 wide x 27 tall. Cols 89-110: the homecoming meadow (cottage is drawn art,
 // not tiles). Row 16 cols 20-23: secret ledge. Perch at 85-88 is the vista bench.
+// The gaps in rows 24-25 are ditches, not pits: the last row is solid all the
+// way across, so they bottom out in drawn earth two tiles down. Step in, hop out
+// (or cling your way up the side).
 // ============================================================================
 const LEVEL = [
   "#..............................................................................................................#",
@@ -137,6 +148,7 @@ const LEVEL = [
   "#..P..........................####..........##.............##..................................................#",
   "####################....######################....##################.....#######################################",
   "####################....######################....##################.....#######################################",
+  "################################################################################################################",
 ];
 
 // Parse level
@@ -263,6 +275,24 @@ const BODY = {
       "..oooooooooooo..",
       "...oo.oo.oo.oo..",
       "...oo.......oo..",
+      "................",
+    ]},
+  ],
+  // Drawn hooked onto a wall on the RIGHT (flipped for a left-hand wall):
+  // wall-side legs reach out and grip, far-side legs tuck up under the shell.
+  cling: [
+    { eyeY: 3, rows: [
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo.o",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo.o",
+      "..oooooooooooo..",
+      "..oooooooooooo.o",
+      "....oo.oo.oo.oo.",
+      "........oo.oo...",
       "................",
     ]},
   ],
@@ -426,6 +456,15 @@ function sndStep() {
   s.connect(bp); bp.connect(envG(t0, 0.002, 0.035, 0.05));
   s.start(t0);
 }
+function sndGrab() {                                       // soft chitinous catch on the wall
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  const s = AU.ctx.createBufferSource(); s.buffer = AU.click;
+  const bp = AU.ctx.createBiquadFilter(); bp.type = "bandpass";
+  bp.frequency.value = 480 + Math.random() * 260; bp.Q.value = 1.6;
+  s.connect(bp); bp.connect(envG(t0, 0.003, 0.05, 0.1));
+  s.start(t0);
+}
 function sndSwell() {
   if (!AU.ready) return;
   const t0 = AU.ctx.currentTime;
@@ -531,6 +570,7 @@ const player = {
   w: TUNING.hitboxW, h: TUNING.hitboxH,
   grounded: false, facing: 1,
   coyote: 0, buffer: 0, jumpCutDone: true,
+  clinging: false, clingSide: 0, wallCoyote: 0, wallLock: 0,
   animTime: 0,
   fallT: 0, ouchT: 0, idleT: 0, blinkT: 0, blinkNext: 3,
 };
@@ -538,7 +578,7 @@ const player = {
 // Render/audio event tracker — derived from physics transitions, never feeds back.
 const fx = {
   prevVy: 0, prevGrounded: false,
-  landImpact: 0, jumped: false,       // consumed by render (dust, squash)
+  landImpact: 0, jumped: false, walljumped: false,   // consumed by render (dust, squash)
   squash: 0, squashT: 0,
   sitT: 0, kickT: 0, stepFrame: -1,
 };
@@ -548,6 +588,7 @@ function resetPlayer() {
   player.vx = 0; player.vy = 0;
   player.grounded = false; player.facing = 1;
   player.coyote = 0; player.buffer = 0; player.jumpCutDone = true;
+  player.clinging = false; player.clingSide = 0; player.wallCoyote = 0; player.wallLock = 0;
   player.fallT = 0; player.ouchT = 0; player.idleT = 0; player.blinkT = 0; player.blinkNext = 3;
   cam.x = clamp(player.x + player.w / 2 - VIEW_W / 2, 0, ROOM_W - VIEW_W);
   cam.y = clamp(player.y + player.h / 2 - VIEW_H / 2, 0, ROOM_H - VIEW_H);
@@ -581,18 +622,29 @@ function moveAxis(axis, amount) {
   return hit;
 }
 
+// Is there a solid tile flush against one side of the hitbox? (side: -1 left, +1 right)
+// The vertical probe is inset top and bottom so the lip of a floor you're standing
+// on, or a ceiling you're brushing, never reads as a grabbable wall.
+function wallAt(side) {
+  const px = side > 0 ? player.x + player.w : player.x - 1;
+  const top = player.y + 1, bot = player.y + player.h - 2;
+  for (let py = top; py < bot; py += TILE) if (solidAt(px, py)) return true;
+  return solidAt(px, bot);
+}
+
 function updatePlayer(dt) {
   const T = TUNING;
 
   // --- timers ---
   player.coyote = player.grounded ? T.coyoteMs / 1000 : Math.max(0, player.coyote - dt);
   player.buffer = Math.max(0, player.buffer - dt);
+  player.wallLock = Math.max(0, player.wallLock - dt);
   if (input.jumpPressed) { player.buffer = T.jumpBufferMs / 1000; input.jumpPressed = false; }
 
-  // --- horizontal ---
+  // --- horizontal (input is ignored briefly after a wall kick-off) ---
   const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   const accel = (T.runMax / T.groundAccelTime) * (player.grounded ? 1 : T.airControl);
-  if (dir !== 0) {
+  if (dir !== 0 && player.wallLock <= 0) {
     player.vx = clamp(player.vx + dir * accel * dt, -T.runMax, T.runMax);
     player.facing = dir;
   } else {
@@ -601,13 +653,44 @@ function updatePlayer(dt) {
     else player.vx -= Math.sign(player.vx) * fr;
   }
 
-  // --- jump ---
+  // --- wall cling: airborne, pressing into a wall, and a wall is actually there.
+  // You can only START a cling when you aren't rising, so jumping up a wall you're
+  // already hugging gives a full jump instead of instantly sticking to it. Once
+  // you're on, you stay on until you let go of the direction.
+  const wasClinging = player.clinging;
+  const canCling = !player.grounded && player.wallLock <= 0 && dir !== 0 &&
+                   (wasClinging || player.vy >= 0) && wallAt(dir);
+  if (canCling) {
+    if (!wasClinging) sndGrab();
+    player.clinging = true;
+    player.clingSide = dir;
+    player.facing = dir;                      // face the wall you're holding
+    player.vx = 0;
+    player.wallCoyote = T.wallCoyoteMs / 1000;
+    player.jumpCutDone = true;                // a cling ends any pending jump-cut
+  } else {
+    player.clinging = false;
+    player.wallCoyote = Math.max(0, player.wallCoyote - dt);
+  }
+
+  // --- jump: ground jump wins over a kick-off when both are available ---
   if (player.buffer > 0 && player.coyote > 0) {
     player.vy = -JUMP_VEL;
     player.grounded = false;
     player.coyote = 0;
     player.buffer = 0;
     player.jumpCutDone = false;
+  } else if (player.buffer > 0 && player.wallCoyote > 0) {
+    player.vy = -JUMP_VEL * T.wallJumpMult;
+    player.vx = -player.clingSide * T.wallJumpVx;
+    player.facing = -player.clingSide;
+    player.clinging = false;
+    player.wallCoyote = 0;
+    player.buffer = 0;
+    player.jumpCutDone = false;
+    player.wallLock = T.wallLockMs / 1000;
+    fx.walljumped = true;
+    sndJump();
   }
   // variable height: cut upward velocity once on release while rising
   if (!input.jumpHeld && player.vy < 0 && !player.jumpCutDone) {
@@ -615,9 +698,13 @@ function updatePlayer(dt) {
     player.jumpCutDone = true;
   }
 
-  // --- gravity (asymmetric) ---
-  const g = player.vy < 0 ? GRAV_RISE : GRAV_RISE * T.fallGravityMult;
-  player.vy = Math.min(player.vy + g * dt, T.maxFallSpeed);
+  // --- gravity (asymmetric); a cling swaps it for a slow, steady slide ---
+  if (player.clinging) {
+    player.vy = Math.min(player.vy + GRAV_RISE * dt, T.wallSlideSpeed);
+  } else {
+    const g = player.vy < 0 ? GRAV_RISE : GRAV_RISE * T.fallGravityMult;
+    player.vy = Math.min(player.vy + g * dt, T.maxFallSpeed);
+  }
 
   // --- move & collide ---
   const wasGroundedMoveX = moveAxis("x", player.vx * dt);
@@ -625,6 +712,9 @@ function updatePlayer(dt) {
   player.grounded = false;
   const hitY = moveAxis("y", player.vy * dt);
   if (hitY) player.vy = 0;
+
+  // landing ends a cling outright — no stale wall state while standing
+  if (player.grounded) { player.clinging = false; player.wallCoyote = 0; }
 
   // fell out of a pit? (shouldn't happen — floor is solid — but belt & braces)
   if (player.y > ROOM_H + 64) resetPlayer();
@@ -1256,7 +1346,8 @@ function render(fps, dt) {
   // as a deliberate pixel mascot standing out against the smooth painterly world.
   const moving = Math.abs(player.vx) > 5;
   let set, fps_;
-  if (!player.grounded)  { set = BAKED.air;     fps_ = 1; }
+  if (player.clinging)   { set = BAKED.cling;   fps_ = 1; }
+  else if (!player.grounded) { set = BAKED.air; fps_ = 1; }
   else if (moving)       { set = BAKED.scuttle; fps_ = TUNING.scuttleFps; }
   else                   { set = BAKED.idle;    fps_ = TUNING.idleFps; }
   const frameIdx = ((player.animTime * fps_) | 0) % set.length;
@@ -1305,7 +1396,22 @@ function render(fps, dt) {
         0.25, 1 + Math.random(), THEME.mist.tint, 0.4);
     fx.jumped = false;
   }
+  if (fx.walljumped) {                                    // dust kicked off the wall face
+    const wx = player.x + (player.clingSide > 0 ? player.w : 0);
+    for (let i = 0; i < 4; i++)
+      spawnPart(wx, player.y + 2 + Math.random() * 7,
+        -player.clingSide * (25 + Math.random() * 45), 10 + Math.random() * 25,
+        0.3, 1 + Math.random(), THEME.mist.tint, 0.45);
+    fx.walljumped = false;
+  }
   fx.kickT -= dt;
+  if (player.clinging && player.vy > 5 && fx.kickT <= 0) {              // scrape while sliding
+    fx.kickT = 0.09;
+    const wx = player.x + (player.clingSide > 0 ? player.w : 0);
+    spawnPart(wx, player.y + 3 + Math.random() * 6,
+      -player.clingSide * (8 + Math.random() * 16), -(4 + Math.random() * 12),
+      0.35, 1, THEME.mist.tint, 0.4);
+  }
   if (player.grounded && Math.abs(player.vx) > 110 && fx.kickT <= 0) {   // grass flecks
     fx.kickT = 0.12;
     spawnPart(player.x + (player.vx > 0 ? 0 : player.w), player.y + player.h - 1,
@@ -1397,7 +1503,7 @@ function render(fps, dt) {
 
   if (debugOn) {
     sctx.fillStyle = "rgba(0,0,0,0.6)";
-    sctx.fillRect(PX(2), PY(2), PS(184), PS(60));
+    sctx.fillRect(PX(2), PY(2), PS(184), PS(70));
     sctx.fillStyle = "#7CFC9A";
     sctx.font = PS(8) + "px monospace";
     const L = [
@@ -1405,6 +1511,8 @@ function render(fps, dt) {
       "vel  " + player.vx.toFixed(1) + ", " + player.vy.toFixed(1),
       "grounded " + player.grounded + "  facing " + (player.facing > 0 ? "R" : "L"),
       "coyote " + (player.coyote * 1000).toFixed(0) + "ms  buffer " + (player.buffer * 1000).toFixed(0) + "ms",
+      "cling " + (player.clinging ? (player.clingSide > 0 ? "R" : "L") : "-") +
+        "  wallCoy " + (player.wallCoyote * 1000).toFixed(0) + "ms  lock " + (player.wallLock * 1000).toFixed(0) + "ms",
       "fps " + fps.toFixed(0) + "  cam " + cam.x.toFixed(0) + "," + cam.y.toFixed(0),
     ];
     for (let i = 0; i < L.length; i++) sctx.fillText(L[i], PX(6), PY(6 + i * 10));

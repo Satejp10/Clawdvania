@@ -41,7 +41,15 @@ rewrite.
 
 ## Findings
 
-### 1. The three floor gaps are invisible-floored traps — not holes · **high**
+### 1. The three floor gaps are invisible-floored traps — not holes · **high** · ✅ FIXED
+
+> **Resolved.** The level gained a fully solid bottom row, so the gaps now bottom out in drawn
+> earth two tiles down and read as ditches. Collision is byte-identical (the player still rests
+> at `y = 406`); what changed is that there is now terrain under him and 16px more camera
+> headroom (`cam.y` clamps to 144 instead of 128). The `y > ROOM_H + 64` respawn is still
+> unreachable, but that is now correct rather than a gap — the world is floored everywhere.
+> Kept below for the record.
+
 
 `solidAt` treats everything below the room as solid (`index.html:155`), and the level
 has three gaps in the floor rows (`index.html:138-139`) at columns 20–23, 46–49 and
