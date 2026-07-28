@@ -79,7 +79,15 @@ Two aggravating details:
 
 The middle option best matches "none of the combat, all of the atmosphere".
 
-### 2. `R` after the ending leaves the game unfinishable until reload · **high**
+### 2. `R` after the ending leaves the game unfinishable until reload · **high** · ✅ FIXED
+
+> **Resolved.** `resetPlayer()` is now position-only (still what the out-of-bounds net wants) and
+> `R` calls a new `resetRun()` that also restores `game.state`/`ended`/`endT`, zeroes `wispCount`,
+> resets `playT`, and returns every wisp to `idle` at its home spot. Verified in-browser: collect
+> 3 wisps → reach the door → ending fires → `R` → `{state: "play", ended: false, endT: 0,
+> wispCount: 0, 12 idle, player at [49, 374]}`, and walking back to the door fires the ending a
+> second time (`canReplayEnding` went from `false` to `true`). Kept below for the record.
+
 
 `resetPlayer` (`index.html:546-556`) resets the player and camera and nothing else.
 After the ending has fired, pressing `R` leaves `game.state === "ending"`,
@@ -98,7 +106,26 @@ that after the ending, resetting the player alone isn't a coherent state.
 `resetRun()` that also restores `game.state`/`ended`/`endT`, zeroes `wispCount`, and
 returns every wisp to `idle` at its home spot. Bind `R` to `resetRun`.
 
-### 3. Room boundary walls render as dark pillars in the sky · **medium**
+### 3. Room boundary walls render as dark pillars in the sky · **medium** · ✅ FIXED
+
+> **Resolved, with a correction to the fix below.** Blanking *every* row, as originally written,
+> was wrong on two counts once the ditches and the cling had landed:
+>
+> - The bottom three rows are floor. Blanking those would open a one-tile-wide, three-tile-deep
+>   well at each end of the world, escapable only by a pixel-perfect jump (48px needed against a
+>   49.3px apex). Cols 0 and 111 are now empty in the **sky rows only** (0–23); the floor rows
+>   keep theirs.
+> - `wallAt` probes `player.x - 1`, and `solidAt` returns `true` for anything outside the room —
+>   so the cling grabbed the *invisible* boundary. Simulated: 6 kick-offs put the player at
+>   `y = -41`, above the top of the room, hanging on nothing. Blanking the tiles alone would have
+>   made this worse, not better, by removing the thing you appeared to be holding. `wallAt` now
+>   returns `false` for `px < 0 || px >= ROOM_W`.
+>
+> Verified after: BFS still finds **12/12 wisps**, the bench and the door (16,237 states, up from
+> 16,054 — the extra states are the reclaimed tile at each end); running into either edge stops at
+> `x = 0` / `x = 1778` still grounded; and a cling probe swept across the whole room at sky height
+> finds nothing to hang from. Kept below for the record.
+
 
 Columns 0 and 111 are `#` in all 26 rows, so they bake into `tileCv` as full-height
 earth columns. Both are on-camera: `cam.x` clamps to `[0, 1264]`, and column 0 is
@@ -145,9 +172,9 @@ softens it slightly.
 
 ## Smaller notes
 
-- **`wispCount >= 12` is hardcoded** in the end card (`index.html:1469`). Should be
+- ~~**`wispCount >= 12` is hardcoded** in the end card (`index.html:1469`). Should be
   `WISP_SPOTS.length` — add a thirteenth wisp and the "every last wisp" line silently
-  stops being reachable.
+  stops being reachable.~~ ✅ **Fixed** — now reads `WISP_SPOTS.length`.
 - **Gameplay state lives in the render pass.** `updateWisps` (`index.html:1335`) sets
   `wispCount` and gates the ending, but runs from `render()` on variable `dt` rather
   than in the fixed-step loop. The margin is comfortable today (~7px of player movement
@@ -170,7 +197,20 @@ softens it slightly.
 
 ## Suggested order
 
-1. Finding 2 (`resetRun`) — smallest diff, removes a dead-end state.
-2. Finding 1 (the pits) — biggest impact on first-play impression; needs an art call.
-3. Finding 3 (boundary columns) — one-line edit to the level strings.
-4. Findings 4 and 5 — polish, best done together in the resize/draw path.
+1. ~~Finding 2 (`resetRun`) — smallest diff, removes a dead-end state.~~ ✅ done
+2. ~~Finding 1 (the pits) — biggest impact on first-play impression; needs an art call.~~ ✅ done
+3. ~~Finding 3 (boundary columns) — one-line edit to the level strings.~~ ✅ done (it was not
+   a one-line edit — see the correction above)
+4. Findings 4 and 5 — polish, best done together in the resize/draw path. **Still open.**
+
+## Still open
+
+- **Finding 4** — fractional render scale makes Clawd's pixels uneven.
+- **Finding 5** — `devicePixelRatio` is uncapped.
+- The smaller notes above that aren't struck through.
+- **The cling has nowhere to matter.** With the boundary columns gone, the tallest grabbable
+  faces in the level are the two-column tower at 44–45 and the platform edges, all three tiles
+  or less. Measured climb rate is **24.5px of net gain per kick-off** (the arc peaks 47.3px up,
+  but you spend the back half falling as you return to the wall), so a wall needs to be four
+  tiles or more before a climb takes more than one cycle. That's a level-design change, not a
+  fix, and it's the obvious next thing if the ability is meant to be used rather than owned.

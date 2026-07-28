@@ -14,7 +14,7 @@
 | Space / W / Up | Jump (tap = short hop, hold = full jump) |
 | Hold direction into a wall | **Cling** — hang on, slide slowly |
 | Jump while clinging | Kick off the wall |
-| R | Reset to spawn |
+| R | Restart the walk — back to spawn, wisps returned to where you found them, ending re-armed |
 | M | Mute audio |
 | ` (backtick) | Debug overlay (pos, vel, coyote/buffer/wall timers, FPS) |
 
