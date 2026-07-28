@@ -82,6 +82,11 @@ const TUNING = {
   wallLockMs: 130,        // horizontal input ignored after a kick-off, so you clear the wall
   wallCoyoteMs: 90,       // grace to still kick off just after sliding past the wall's end
 
+  // Double jump — one extra beat in the air. Refreshed by ground contact AND by
+  // catching a wall, so a cling-and-kick chain never strands you without it.
+  airJumps: 1,            // extra jumps between one wall/ground touch and the next
+  airJumpMult: 0.86,      // fraction of JUMP_VEL — lighter than a standing jump
+
   // Forgiveness — the stuff "feels good" is made of
   coyoteMs: 100,          // grace after walking off a ledge
   jumpBufferMs: 120,      // early jump press remembered before landing
@@ -441,6 +446,15 @@ function sndJump() {
   o.connect(envG(t0, 0.008, 0.05, 0.14));
   o.start(t0); o.stop(t0 + 0.2);
 }
+function sndAirJump() {                                    // the second beat: lighter, higher, shorter
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  const o = AU.ctx.createOscillator(); o.type = "triangle";
+  o.frequency.setValueAtTime(380, t0);
+  o.frequency.exponentialRampToValueAtTime(720, t0 + 0.075);
+  o.connect(envG(t0, 0.005, 0.035, 0.10));
+  o.start(t0); o.stop(t0 + 0.16);
+}
 function sndLand(impact) {
   if (!AU.ready) return;
   const t0 = AU.ctx.currentTime;
@@ -574,6 +588,7 @@ const player = {
   grounded: false, facing: 1,
   coyote: 0, buffer: 0, jumpCutDone: true,
   clinging: false, clingSide: 0, wallCoyote: 0, wallLock: 0,
+  airJumpsLeft: 0,
   animTime: 0,
   fallT: 0, ouchT: 0, idleT: 0, blinkT: 0, blinkNext: 3,
 };
@@ -581,7 +596,7 @@ const player = {
 // Render/audio event tracker — derived from physics transitions, never feeds back.
 const fx = {
   prevVy: 0, prevGrounded: false,
-  landImpact: 0, jumped: false, walljumped: false,   // consumed by render (dust, squash)
+  landImpact: 0, jumped: false, walljumped: false, airjumped: false,  // consumed by render (dust, squash)
   squash: 0, squashT: 0,
   sitT: 0, kickT: 0, stepFrame: -1,
 };
@@ -594,6 +609,7 @@ function resetPlayer() {
   player.grounded = false; player.facing = 1;
   player.coyote = 0; player.buffer = 0; player.jumpCutDone = true;
   player.clinging = false; player.clingSide = 0; player.wallCoyote = 0; player.wallLock = 0;
+  player.airJumpsLeft = 0;
   player.fallT = 0; player.ouchT = 0; player.idleT = 0; player.blinkT = 0; player.blinkNext = 3;
   cam.x = clamp(player.x + player.w / 2 - VIEW_W / 2, 0, ROOM_W - VIEW_W);
   cam.y = clamp(player.y + player.h / 2 - VIEW_H / 2, 0, ROOM_H - VIEW_H);
@@ -693,18 +709,24 @@ function updatePlayer(dt) {
     player.vx = 0;
     player.wallCoyote = T.wallCoyoteMs / 1000;
     player.jumpCutDone = true;                // a cling ends any pending jump-cut
+    player.airJumpsLeft = T.airJumps;         // catching a wall gives the second beat back
   } else {
     player.clinging = false;
     player.wallCoyote = Math.max(0, player.wallCoyote - dt);
   }
 
-  // --- jump: ground jump wins over a kick-off when both are available ---
+  // --- jump: ground beats a kick-off beats the air jump, when several are live ---
+  // Each branch announces itself. It used to be inferred further down from "vy went
+  // sharply negative", which fired a second time on every kick-off — an audibly
+  // doubled note — and couldn't tell the three kinds of jump apart at all.
   if (player.buffer > 0 && player.coyote > 0) {
     player.vy = -JUMP_VEL;
     player.grounded = false;
     player.coyote = 0;
     player.buffer = 0;
     player.jumpCutDone = false;
+    fx.jumped = true;
+    sndJump();
   } else if (player.buffer > 0 && player.wallCoyote > 0) {
     player.vy = -JUMP_VEL * T.wallJumpMult;
     player.vx = -player.clingSide * T.wallJumpVx;
@@ -716,6 +738,13 @@ function updatePlayer(dt) {
     player.wallLock = T.wallLockMs / 1000;
     fx.walljumped = true;
     sndJump();
+  } else if (player.buffer > 0 && player.airJumpsLeft > 0) {
+    player.airJumpsLeft--;
+    player.vy = -JUMP_VEL * T.airJumpMult;   // set, not added: a late beat still lifts you
+    player.buffer = 0;
+    player.jumpCutDone = false;              // the second beat is variable-height too
+    fx.airjumped = true;
+    sndAirJump();
   }
   // variable height: cut upward velocity once on release while rising
   if (!input.jumpHeld && player.vy < 0 && !player.jumpCutDone) {
@@ -739,7 +768,7 @@ function updatePlayer(dt) {
   if (hitY) player.vy = 0;
 
   // landing ends a cling outright — no stale wall state while standing
-  if (player.grounded) { player.clinging = false; player.wallCoyote = 0; }
+  if (player.grounded) { player.clinging = false; player.wallCoyote = 0; player.airJumpsLeft = T.airJumps; }
 
   // fell out of a pit? (shouldn't happen — floor is solid — but belt & braces)
   if (player.y > ROOM_H + 64) resetPlayer();
@@ -761,10 +790,6 @@ function updatePlayer(dt) {
   if (player.grounded && !fx.prevGrounded && fx.prevVy > 60) {
     fx.landImpact = Math.max(fx.landImpact, fx.prevVy);
     sndLand(fx.prevVy);
-  }
-  if (player.vy < -JUMP_VEL * 0.8 && fx.prevVy >= -JUMP_VEL * 0.8) {
-    fx.jumped = true;
-    sndJump();
   }
   // bench sit: standing still on the vista stump
   const onBench = player.grounded && dir === 0 && Math.abs(player.vx) < 5 &&
@@ -1421,6 +1446,17 @@ function render(fps, dt) {
         0.25, 1 + Math.random(), THEME.mist.tint, 0.4);
     fx.jumped = false;
   }
+  if (fx.airjumped) {                                     // a ring of air kicked out underfoot
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2;
+      spawnPart(player.x + player.w / 2 + Math.cos(a) * 4, player.y + player.h - 2,
+        Math.cos(a) * 52, Math.sin(a) * 14 + 6,
+        0.3, 1 + Math.random(), THEME.mist.tint, 0.5);
+    }
+    fx.squash = -0.16;                                    // negative squash reads as a stretch
+    fx.squashT = 0.16;
+    fx.airjumped = false;
+  }
   if (fx.walljumped) {                                    // dust kicked off the wall face
     const wx = player.x + (player.clingSide > 0 ? player.w : 0);
     for (let i = 0; i < 4; i++)
@@ -1535,7 +1571,7 @@ function render(fps, dt) {
       "pos  " + player.x.toFixed(1) + ", " + player.y.toFixed(1),
       "vel  " + player.vx.toFixed(1) + ", " + player.vy.toFixed(1),
       "grounded " + player.grounded + "  facing " + (player.facing > 0 ? "R" : "L"),
-      "coyote " + (player.coyote * 1000).toFixed(0) + "ms  buffer " + (player.buffer * 1000).toFixed(0) + "ms",
+      "coyote " + (player.coyote * 1000).toFixed(0) + "ms  buffer " + (player.buffer * 1000).toFixed(0) + "ms  air " + player.airJumpsLeft,
       "cling " + (player.clinging ? (player.clingSide > 0 ? "R" : "L") : "-") +
         "  wallCoy " + (player.wallCoyote * 1000).toFixed(0) + "ms  lock " + (player.wallLock * 1000).toFixed(0) + "ms",
       "fps " + fps.toFixed(0) + "  cam " + cam.x.toFixed(0) + "," + cam.y.toFixed(0),

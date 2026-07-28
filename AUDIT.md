@@ -208,9 +208,27 @@ softens it slightly.
 - **Finding 4** — fractional render scale makes Clawd's pixels uneven.
 - **Finding 5** — `devicePixelRatio` is uncapped.
 - The smaller notes above that aren't struck through.
-- **The cling has nowhere to matter.** With the boundary columns gone, the tallest grabbable
-  faces in the level are the two-column tower at 44–45 and the platform edges, all three tiles
-  or less. Measured climb rate is **24.5px of net gain per kick-off** (the arc peaks 47.3px up,
-  but you spend the back half falling as you return to the wall), so a wall needs to be four
-  tiles or more before a climb takes more than one cycle. That's a level-design change, not a
-  fix, and it's the obvious next thing if the ability is meant to be used rather than owned.
+- **The abilities have nowhere to matter — now doubly so.** With the boundary columns gone, the
+  tallest grabbable faces in the level are the two-column tower at 44–45 and the platform edges,
+  all three tiles or less. Measured cling climb rate is **24.5px of net gain per kick-off** (the
+  arc peaks 47.3px up, but you spend the back half falling as you return to the wall), so no wall
+  in the game takes more than two cycles. The double jump sharpens the same point from the other
+  side: it clears **85.5px** in one go against a 49.3px single jump, and a BFS with it enabled
+  stands on exactly the same nine surface rows as one without — every platform was already
+  reachable, so the ability only makes the existing route easier. Both abilities are complete and
+  correct; the level is what's missing. A vertical section — a ravine to climb out of, or a
+  chimney between two facing walls — is the change that would make either of them mean something.
+  That's level design, not a fix.
+
+### Found and fixed while adding the double jump
+
+**Every wall jump played `sndJump()` twice.** The kick-off branch called it directly, and a
+separate detector further down inferred "a jump happened" from `vy` going sharply negative
+(`player.vy < -JUMP_VEL * 0.8 && fx.prevVy >= -JUMP_VEL * 0.8`) and called it again in the same
+tick. Measured by wrapping `sndJump` and driving `updatePlayer` synchronously: ground jump 1 call,
+wall jump **2**. Audible as a doubled, louder note on every kick-off.
+
+The detector existed because the ground-jump branch didn't announce itself. All three jump kinds
+now set their own `fx` flag and play their own sound in their own branch, and the detector is
+gone — which is also what let the air jump have a distinct tell rather than borrowing the ground
+jump's. Re-measured after: ground 1, wall 1, air 1 (and `sndAirJump`, not `sndJump`).
