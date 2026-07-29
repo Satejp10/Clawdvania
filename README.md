@@ -1,5 +1,11 @@
 # Clawdvania
 
+### ▶ [**Play it in your browser**](https://satejp10.github.io/Clawdvania/)
+
+No install, no build step, nothing to download — it's one HTML file.
+
+[![Clawdvania — the title screen, dusk over the autumn hills](docs/screenshot.png)](https://satejp10.github.io/Clawdvania/)
+
 **A five-minute walk home at dusk**, starring **Clawd**, the orange pixel-crab. Cross the autumn hills as the light fades, gather the wisps that drift along the way (they'll orbit you and light your path), rest on the bench at the overlook, and make it to the cottage before dark. Inspired by the quiet moments of *Ori* and *Hollow Knight* — none of the combat, all of the atmosphere.
 
 **Single self-contained `index.html`.** Vanilla JS + Canvas 2D. No engine, no build step, no asset files — Clawd is an inline pixel-array sprite and the world is entirely procedural. Open the file in a browser and play.
