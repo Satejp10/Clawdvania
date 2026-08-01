@@ -48,3 +48,37 @@ Entry format:
 - next: replace the sprite system's single scalar `fps` per pose set with per-frame
   durations. Uneven holds are currently inexpressible by construction, which blocks
   every queued animation improvement.
+
+## 2026-08-01 | session 2 | web
+- did: delivered SR-clawdvania-001 to chat; answers came back and are recorded below as
+  decisions rather than open questions.
+- decided: Clawdvania stays a five-minute vignette and gets **one** ravine, not a second
+  area. Scopes the vertical section to a single addition instead of open-ended growth.
+- decided: "one file" is locked, but data URIs satisfy it, so asset-shaped work is not
+  blocked by the constraint. Clawd's sprites are inline pixel arrays and need nothing.
+- decided: audience is a **portfolio piece**, which argues polish over content when the
+  two compete. This reorders the backlog: presentation work outranks new level content.
+- proposed (not yet confirmed by the author): no fail state, no timer or score, no
+  backtracking. Recorded as a proposal, not an invariant, until the author confirms.
+- did: added Open Graph and Twitter card meta tags to `index.html`, plus a meta
+  description and theme-color. Crawlers only — the game never fetches the image, so it
+  still runs from `file://` with nothing to load. The image URL is absolute because a
+  crawler resolves it against its own host, not the page.
+- did: generated `docs/thumbnail.png` at 1200x750 for both the link preview and the
+  claude-works submission. Rendered at 1536x864 (S=3, an integer scale so sprite pixels
+  stay uniform) and cropped, rather than rendered at 1200x750 directly, because that
+  size forces a fractional scale of 2.34 and a ragged sprite outline.
+- broke/fixed: fixed two section-numbering errors in the `project-status` skill. The
+  template header told the reading assistant to answer "Section 5's open questions" when
+  open questions are Section 3 and Section 5 is the verification ledger; `SKILL.md`
+  separately called decisions "Section 3" when the template puts them at 2.4. The first
+  was reported by the chat assistant, the second found while checking for more of the
+  same. Note: these live in the user's skill directory, outside this repo, so the fix is
+  not carried by this commit.
+- correction: SR-clawdvania-001 as merged still carries the stale "Section 5" pointer in
+  its header. Harmless — delivery already succeeded — and left as-is rather than
+  rewriting a delivered artifact. Reports from 002 on will be correct.
+- open: what "claude-works" requires beyond a 1200x750 thumbnail. The "external-work
+  path" was named but not described, and nothing in this repo defines it.
+- next: the ravine. Scope is now settled at one, and it is the only queued item that
+  changes how the game plays.
