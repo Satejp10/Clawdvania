@@ -29,6 +29,12 @@ file; there is nothing to install and no test suite to run.
 Live at https://satejp10.github.io/Clawdvania/ (GitHub Pages, served from
 `main`). Note the capital C — the lowercase path 404s.
 
+**Scope, decided 2026-08-01:** it's a **portfolio piece**, so when polish and content
+compete, polish wins. It stays a **five-minute vignette** — the agreed vertical addition
+is *one* ravine, not a second area. "One file" is locked, but data URIs satisfy it, so
+that constraint doesn't block asset-shaped work. Proposed and not yet confirmed: no fail
+state, no timer or score, no backtracking.
+
 Things worth knowing before changing it:
 
 - **Movement constants live in the `TUNING` object** at the top of the file.
