@@ -100,3 +100,15 @@ Entry format:
   `updateWisps` running on variable `dt` from the render pass has real teeth.
 - next: the ravine, unchanged. Every blocker on it is cleared — scope is settled at one,
   and the presentation work that "polish over content" prioritised is shipped.
+- did: generated status report SR-clawdvania-002 and verified state rather than recalling
+  it — headless boot reaches the title with zero page errors; the live build is
+  byte-for-byte identical to local `index.html` (74207 bytes both); the thumbnail serves
+  HTTP 200 as image/png at 377379 bytes; 15 og:/twitter: tags are live on the deployed
+  page; tree clean; 4 commits since report 001.
+- did: recorded that SR-clawdvania-001 was delivered to chat and confirmed — the four
+  open questions it raised came back answered, which is why they appear as decisions in
+  report 002 rather than as questions.
+- open: report 002 asks three questions — whether the four-item definition of "stable"
+  is accepted; whether "no fail state / no timer / no backtracking" is confirmed rather
+  than merely proposed; and whether the ravine is gated or optional (must the player
+  descend it to finish the walk, or is it a pocket holding a wisp?).
