@@ -112,3 +112,31 @@ Entry format:
   is accepted; whether "no fail state / no timer / no backtracking" is confirmed rather
   than merely proposed; and whether the ravine is gated or optional (must the player
   descend it to finish the walk, or is it a pocket holding a wisp?).
+- did: replaced the sprite frame picker with per-frame durations. Selection was
+  `((animTime * fps_) | 0) % set.length` — one scalar fps per pose set, so an uneven
+  frame hold was inexpressible by construction. Now each set has a baseline rate
+  (`ANIM_FPS`) and any frame may override it with `hold: <seconds>`; cumulative frame
+  end-times are built once at boot into `TIMING`, and `frameAt(name, time)` walks them.
+  This is the first half of item (2) of the proposed definition of stable.
+- decided: ship the mechanism with **no frame setting a `hold` yet**, so the change is a
+  behavioural no-op. The author explicitly likes the current animations, so which frames
+  get uneven timing is a taste call that stays theirs; building the capability without
+  spending it keeps the two decisions separate and the diff reviewable on its own terms.
+- did: verified the no-op by simulation rather than by eye. 944,000-sample sweep (60Hz to
+  600s plus a dense 0.0001s sweep) across all four sets: 6,448 mismatches, **every one at
+  distance exactly 0 from a true frame boundary**, zero mid-hold disagreements — the two
+  pickers agree mathematically and round opposite ways on exact ties. Frame-*change*
+  counts are identical (scuttle 6000/6000, idle 1800/1800 over 600s), which is what
+  matters because `sndStep()` fires on frame change; no doubled or dropped footsteps.
+  Headless boot: no page errors, all four sets reach every frame they declare over three
+  full cycles, game reaches `play` and walks.
+- broke/fixed: incidental — the old `| 0` was a 32-bit truncation, so frame selection
+  would have broken after `animTime` passed ~2^31/fps seconds (~6.8 years of scuttling).
+  Not reachable in practice; the replacement has no such ceiling.
+- open: two scheduled routines belonging to *other* sessions, surfaced while cleaning up
+  this project's triggers and reported to the author but not acted on — a duplicated
+  "run /doctor" reminder that will fire twice on 2026-08-05, and a "Daily build log" cron
+  whose next run is 2026-07-13, i.e. stalled. Not this repo's, so left alone.
+- next: unchanged — the ravine, once the gated-or-optional question is answered. The
+  cheapest first use of per-frame holds is the `air` set, which is a single pose today,
+  so Clawd looks the same at jump apex as in freefall.

@@ -215,6 +215,11 @@ const SPR_W = 16, SPR_H = 12;
 // Body poses only — eyes are stamped on at bake time (see EYES below), so
 // 6 poses x 4 expressions never has to be hand-drawn.
 // Boxy official Clawd: flat coral slab, side nubs, four stub legs.
+//
+// A frame may carry `hold: <seconds>` to override its set's baseline rate (see
+// ANIM_FPS / TIMING below). Even cadence is the default; uneven holds are how an
+// anticipation frame gets to sit while the frames around it snap past. No frame
+// sets one yet, so every set currently plays evenly.
 const BODY = {
   idle: [
     { eyeY: 3, rows: [
@@ -383,6 +388,35 @@ for (const name of Object.keys(BODY)) {
     }
     return out;
   });
+}
+
+// Baseline frame rate per pose set. A frame's own `hold` beats this.
+const ANIM_FPS = {
+  idle:    TUNING.idleFps,
+  scuttle: TUNING.scuttleFps,
+  air:     1,
+  cling:   1,
+};
+// Cumulative frame end-times, built once at boot. ends[i] is when frame i stops
+// being shown; total is one full cycle. Storing ends rather than durations makes
+// the lookup a single walk with no running sum per render.
+const TIMING = {};
+for (const name of Object.keys(BODY)) {
+  const base = 1 / ANIM_FPS[name];
+  const ends = [];
+  let t = 0;
+  for (const f of BODY[name]) { t += (f.hold != null ? f.hold : base); ends.push(t); }
+  TIMING[name] = { ends, total: t };
+}
+// Which frame of `name` is showing at `time` seconds into the animation.
+function frameAt(name, time) {
+  const { ends, total } = TIMING[name];
+  if (ends.length === 1) return 0;
+  let p = time % total;
+  if (p < 0) p += total;                       // animTime never goes negative, but
+  for (let i = 0; i < ends.length; i++)        // don't let a stray one index -1
+    if (p < ends[i]) return i;
+  return ends.length - 1;                      // only reachable on float slop at p==total
 }
 
 // ============================================================================
@@ -1415,14 +1449,14 @@ function render(fps, dt) {
   // Clawd — sprite is 16x12 around a 14x10 hitbox. Kept crisp (nearest-neighbor)
   // as a deliberate pixel mascot standing out against the smooth painterly world.
   const moving = Math.abs(player.vx) > 5;
-  let set, fps_;
-  if (player.clinging)   { set = BAKED.cling;   fps_ = 1; }
-  else if (!player.grounded) { set = BAKED.air; fps_ = 1; }
-  else if (moving)       { set = BAKED.scuttle; fps_ = TUNING.scuttleFps; }
-  else                   { set = BAKED.idle;    fps_ = TUNING.idleFps; }
-  const frameIdx = ((player.animTime * fps_) | 0) % set.length;
-  const frame = set[frameIdx];
-  if (set === BAKED.scuttle) {                 // footstep ticks on frame changes
+  let poseSet;
+  if (player.clinging)       poseSet = "cling";
+  else if (!player.grounded) poseSet = "air";
+  else if (moving)           poseSet = "scuttle";
+  else                       poseSet = "idle";
+  const frameIdx = frameAt(poseSet, player.animTime);
+  const frame = BAKED[poseSet][frameIdx];
+  if (poseSet === "scuttle") {                 // footstep ticks on frame changes
     if (frameIdx !== fx.stepFrame) { fx.stepFrame = frameIdx; sndStep(); }
   } else fx.stepFrame = -1;
   const expr = player.ouchT > 0 ? "ouch"
