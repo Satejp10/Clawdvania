@@ -82,3 +82,21 @@ Entry format:
   path" was named but not described, and nothing in this repo defines it.
 - next: the ravine. Scope is now settled at one, and it is the only queued item that
   changes how the game plays.
+
+## 2026-08-01 | session 3 | web
+- decided: **claude-works submission is paused** until the project reaches a stable
+  state. Supersedes the open question from session 2 about the external-work path —
+  it is parked, not blocked, and should not be raised again until the author reopens it.
+  The 1200x750 thumbnail is already built, committed and verified live, so nothing is
+  lost by waiting.
+- did: confirmed the PR #7 deploy end to end after merge. `docs/thumbnail.png` serves
+  HTTP 200 as `image/png` at 377379 bytes, and the `og:*` / `twitter:*` tags are live
+  on the deployed page — so link previews work against the real host, not just in source.
+- proposed (not yet confirmed by the author): a definition of "stable" so the remaining
+  work has a finish line rather than an open-ended polish loop. Four items, in order —
+  (1) the ravine, so the cling and double jump stop being decorative; (2) per-frame
+  sprite durations, then an anticipation frame and 2-3 `air` poses; (3) audit findings
+  4 and 5 together in the resize/draw path; (4) the smaller notes, of which only
+  `updateWisps` running on variable `dt` from the render pass has real teeth.
+- next: the ravine, unchanged. Every blocker on it is cleared — scope is settled at one,
+  and the presentation work that "polish over content" prioritised is shipped.
