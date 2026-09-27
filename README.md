@@ -1,3 +1,9 @@
+<p align="center">
+  <a href="https://satejp10.github.io/Clawdvania/">
+    <img src="Resources/Clawdvania_Poster_V3_Wisps.png" width="480" alt="Clawdvania poster — a walk home at dusk: Clawd the orange pixel crab on a grassy hill at twilight, a trail of glowing wisps leading up to a lit cottage on the far hill.">
+  </a>
+</p>
+
 # Clawdvania
 
 ### ▶ [**Play it in your browser**](https://satejp10.github.io/Clawdvania/)
