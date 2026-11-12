@@ -559,9 +559,9 @@ output into the PR description, along with what the screenshots showed.
   view, so a hole there shows up on the surface as a gap in the ground.
 - **No one-tile-wide holes in a floor Clawd runs across.** At full speed he falls into one only
   about 86% of the time, which reads as a bug.
-- **Keep `RAVINE.panTime` at 0.6 or less.** Lowest point of Clawd's feet during a fast plunge,
-  on a 288px-tall screen: 0.45s gives 269, 0.5s gives 273 (chosen), 0.6s gives 282, and 0.7s
-  gives 293, which is off the screen.
+- **Keep `RAVINE.panTime` at 0.6 or less.** At 0.5s (chosen), the checker's worst plunge puts
+  Clawd's feet at 274 on a 288px-tall screen. An earlier measurement with a milder plunge put
+  0.6s at 282 and 0.7s at 293, which is off the screen.
 - **Only put rungs under open sky.** A rung under an overhang loses headroom, and the
   plain-jump way out stops working.
 - **Keep every wisp clearly in reach or clearly out of it.** Pickup is 15px from a wisp that
