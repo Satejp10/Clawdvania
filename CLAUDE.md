@@ -24,16 +24,18 @@ as suggestions and don't get built unasked.
 
 A single self-contained `index.html` — vanilla JS + Canvas 2D, no engine, no
 build step, no asset files, runs from `file://`. Everything lives in that one
-file; there is nothing to install and no test suite to run.
+file; there is nothing to install and no test suite to run. The one tool is
+`tools/verify.js`, a movement checker in plain Node (see below).
 
 Live at https://satejp10.github.io/Clawdvania/ (GitHub Pages, served from
 `main`). Note the capital C — the lowercase path 404s.
 
 **Scope, decided 2026-08-01:** it's a **portfolio piece**, so when polish and content
 compete, polish wins. It stays a **five-minute vignette** — the agreed vertical addition
-is *one* ravine, not a second area. "One file" is locked, but data URIs satisfy it, so
-that constraint doesn't block asset-shaped work. Proposed and not yet confirmed: no fail
-state, no timer or score, no backtracking.
+is *one* ravine, not a second area. It's planned as an optional pocket under the third
+ditch, step by step, in `.claude/context/plans/ravine.md`. "One file" is locked, but data
+URIs satisfy it, so that constraint doesn't block asset-shaped work. Proposed and not yet
+confirmed: no fail state, no timer or score, no backtracking.
 
 Things worth knowing before changing it:
 
@@ -43,10 +45,13 @@ Things worth knowing before changing it:
 - **The simulation is fixed-timestep at 60Hz** with an accumulator. Rendering is
   separate and runs on whatever `dt` the browser gives. Don't move physics into
   the render pass.
-- **Verify movement changes by simulation, not by eye.** Extracting `LEVEL` and
-  `TUNING` and running a headless replica of the physics — then a reachability
-  search over it — catches things playtesting misses, like a platform that
-  quietly became unreachable or a wall that became climbable when it shouldn't be.
+- **Verify movement changes by simulation, not by eye.** `node tools/verify.js`
+  runs the game's own physics headlessly and searches what each ability set can
+  reach. That catches things playtesting misses, like a platform that quietly
+  became unreachable or a wall that became climbable when it shouldn't be. It
+  also checks for soft-locks and the ravine camera, and with `--baseline old.html`
+  proves the unchanged parts of the walk play exactly as before. When the level
+  or the wisps change on purpose, update its `EXPECT` table in the same commit.
 - **Headless browser rendering is very slow** (single-digit FPS). To test game
   logic in a browser, drive the update function synchronously inside
   `page.evaluate` so the render loop can't interleave and make results

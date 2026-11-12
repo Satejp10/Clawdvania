@@ -140,3 +140,52 @@ Entry format:
 - next: unchanged — the ravine, once the gated-or-optional question is answered. The
   cheapest first use of per-frame holds is the `air` set, which is a single pose today,
   so Clawd looks the same at jump apex as in freefall.
+
+## 2026-11-12 | session 5 | web
+- note: session 4 (2026-09-27) worked on branch `claude/project-audit-nreywo`. Its README
+  poster change merged as PR #11, but its log entry sits in draft PR #12, unmerged,
+  together with a different ravine (see open).
+- decided: the ravine is an **optional side pocket** under the third ditch (cols 68-72),
+  not part of the way home, because the walk stays a five-minute walk and the pocket
+  rewards curiosity. This answers report 002's gated-or-optional question; the author
+  approved it in chat. It conflicts with draft PR #12 (see open).
+- did: planned the ravine step by step in `.claude/context/plans/ravine.md`, with the
+  exact tested code for every edit, and prototyped it in a scratch copy that is not
+  committed. Applying the plan's edits to `index.html` reproduces the tested prototype
+  byte for byte (checked mechanically). `index.html` itself is unchanged.
+- did: added `tools/verify.js`, a movement checker in plain Node. It runs the game's own
+  `updatePlayer` / `updateCamera` with the browser stubbed out and checks level
+  integrity, reach per ability set against an `EXPECT` table, soft-locks over the whole
+  level, an 85% jump-and-run handicap, the ravine camera, and optionally (`--baseline`)
+  tick-for-tick lockstep against an older build and (`--deep`) a dense every-input
+  search inside the ravine's hollows. Today's `index.html`: PASS, 12/12 wisps for every
+  ability set, 655 places to stand, 0 stuck.
+- decided: wisp 13 is free (the lure, visible from the surface), 14 needs the double jump,
+  15 needs the cling, so each ability gets exactly one thing it's for. On the prototype:
+  base 13/15, double jump 14/15, cling 15/15; soft-lock 0 of 714; the deep search gets no
+  closer than 32px to wisp 14 without the double jump and 44px to wisp 15 without the
+  cling, against a 15px pickup.
+- decided: one fixed camera frame for the whole ravine with a 0.5s tilt, because a
+  follow camera sways with the lookahead during wall kicks and lets Clawd drop off the
+  bottom of the screen in a plunge. Feet stay at or above 274 of 288; a 0.7s tilt
+  already puts them off screen.
+- decided: the way out uses only plain jumps (one-tile rungs every 32px on alternating
+  walls, under open sky), because an optional pocket must never trap a player who lacks
+  a skill. Still true with jump and run at 85%.
+- rejected: leaving the roofed cells see-through like the open gorge, because the
+  hollows then read as floating slabs of ground. They get a dark rock back wall
+  (`#120e1c`, picked by eye from four candidates).
+- correction: earlier in this session the author was told the ravine "costs one pull
+  request of level data plus a reachability check". That was too low. It also needs a
+  camera zone (with the surface clamp kept separate from the taller room), a back wall
+  for roofed cells, a fix so the leaves keep their density, three wisps and doc updates.
+  Still one pull request.
+- open: **which ravine.** Draft PR #12 (2026-09-27, unmerged) raises the far side of the
+  same ditch into a 64px wall, which gates the bench, the door and the last two wisps
+  behind the double jump or the cling. This plan digs an optional pocket instead. Only one
+  can ship. Recommended: build this plan and close #12, because the author's latest call
+  is optional, the pocket matches the V2 poster, and a gated ending walls out anyone who
+  never finds the double jump. The author decides; nobody closes #12 unasked.
+- next: the author picks between this plan and PR #12. If it's this plan, close #12, build
+  per the plan in the next session, then the author plays it once in a real browser,
+  since a feel check is the one thing the checker can't do.
