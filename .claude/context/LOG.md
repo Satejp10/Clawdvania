@@ -140,3 +140,45 @@ Entry format:
 - next: unchanged — the ravine, once the gated-or-optional question is answered. The
   cheapest first use of per-frame holds is the `air` set, which is a single pose today,
   so Clawd looks the same at jump apex as in freefall.
+
+## 2026-09-27 | session 4 | web
+- did: added the V3 Wisps poster to the top of the README, above the title, linked to the
+  game and capped at 480px wide because it is a 1536x2304 portrait. The author first asked
+  for it to replace the title-screen screenshot, then changed that to "put it at the top",
+  so the screenshot stays. Merged as PR #11.
+- broke/fixed: **the ravine was lost once.** It was built and verified after session 3, but
+  plan mode was switched back on before it could be committed, and the container was
+  reclaimed before plan mode lifted. Nothing had been pushed. Rebuilt today to the same
+  layout and committed and pushed *before* any testing. Rule from here: in a cloud session,
+  push a change as soon as it exists, then verify it.
+- did: built the ravine. The third ditch (cols 68-72) keeps its floor, and its far side is
+  built up: col 73 is a 64px face from the ditch floor (y=416) to its top (y=352), with a
+  plateau at y=320 behind it that joins the platform at cols 80-83. Only LEVEL rows 20-23
+  and the comment above LEVEL change; ROOM_H, the camera clamps, solidAt, wallAt, TUNING
+  and WISP_SPOTS are untouched.
+- decided: **built up, not dug down.** Only three rows exist below the walking surface, so
+  digging would mean growing ROOM_H and reworking the camera clamps, parallax and drawn
+  earth. Raising looks the same from the player's side. Cheap to reverse: four LEVEL rows.
+- decided: **gated.** The bench, the cottage door and the last two wisps are past it, so
+  reaching the ending needs the cling or the double jump. This was the stated assumption in
+  the plan the author approved. Making it optional instead (so a player can walk past) is a
+  one-row change.
+- did: verified with the headless physics replica and reachability search, then in the
+  browser. A single jump (measured apex 49.3px) can't cross; the double jump alone and the
+  cling alone each can. Whole level: with abilities, 12/12 wisps plus the bench and the door;
+  without, 10/12 wisps (the ravine wisp and the bench wisp are missing) and neither the bench
+  nor the door. Row 17, the vista perch, is now reachable only with an ability, where before,
+  abilities on and off stood on the same nine rows. Nobody is stranded: all 42 reachable
+  states in the ditch climb back out to the left with no abilities. In the browser: no page
+  errors, ROOM_H 432 and camera max 144 unchanged, and the ending still fires at the door.
+- broke/fixed: a bug in the test harness, not the game. The first version let go of the jump
+  button a few ticks after the first press, which cut every wall kick-off to 40% height and
+  made the cling route look impossible. Traced it frame by frame, fixed the harness and
+  re-ran. The level was never the problem.
+- open: whether the ravine should stay gated (see above).
+- open: `Resources/Clawdvania_Poster_V3_Wisps_cropped.png` (1536x1684, close to square) was
+  uploaded and isn't referenced anywhere yet. It may have been meant as a shorter README
+  poster; not acted on because nobody asked.
+- next: the rest of the proposed "stable" list, which the author still hasn't confirmed:
+  2-3 `air` poses using the per-frame holds, then audit findings 4 and 5 together in the
+  resize/draw path.
