@@ -208,7 +208,18 @@ softens it slightly.
 - **Finding 4** — fractional render scale makes Clawd's pixels uneven.
 - **Finding 5** — `devicePixelRatio` is uncapped.
 - The smaller notes above that aren't struck through.
-- **The abilities have nowhere to matter — now doubly so.** With the boundary columns gone, the
+- ~~**The abilities have nowhere to matter — now doubly so.**~~ ✅ **Resolved by the ravine.**
+
+  > The third ditch (cols 68–72) keeps its floor, and its far side is now built up: col 73 is a
+  > 64px face from the ditch floor (y=416) to its top (y=352), with a plateau at y=320 behind it.
+  > Re-measured with the same reachability search: a single jump (49.3px apex) can't clear it,
+  > while the double jump alone and the cling alone each can. With no abilities you now reach
+  > 10/12 wisps and neither the bench nor the door. Row 17, the vista perch, is stood on only with
+  > an ability, where before, abilities on and off stood on the same nine rows. Nobody is stranded:
+  > all 42 reachable states in the ditch climb back out to the left with no abilities. Kept below
+  > for the record.
+
+  With the boundary columns gone, the
   tallest grabbable faces in the level are the two-column tower at 44–45 and the platform edges,
   all three tiles or less. Measured cling climb rate is **24.5px of net gain per kick-off** (the
   arc peaks 47.3px up, but you spend the back half falling as you return to the wall), so no wall
