@@ -9,21 +9,20 @@ order turns today's `index.html` into the tested prototype byte for byte (that w
 mechanically before this plan was committed). If you find yourself writing new logic, stop:
 something has drifted.
 
-## Settle this first: draft PR #12
+## Settled: PR #12
 
-Draft PR #12 (branch `claude/project-audit-nreywo`, opened 2026-09-27, not merged) built a
-*different* ravine at this same ditch. Instead of digging down, it raises the far side into a
-64px wall, which makes the double jump or the cling **required** to reach the bench, the door
-and the last two wisps. This plan and PR #12 can't both ship: the scope is one ravine, and
-they disagree on whether it gates the ending.
+PR #12 (branch `claude/project-audit-nreywo`) built a *different* ravine at this same ditch.
+Instead of digging down, it raised the far side into a 64px wall, meant to make the double
+jump or the cling required to reach the bench and the door. (It doesn't quite: a plain jump
+pressed just after running off the floating platform at cols 62-65 still clears it. See
+session 6 in `LOG.md`.) On 2026-11-16 it was merged by mistake, a minute before this plan,
+and then undone: `index.html` and `AUDIT.md` are back to how they were before it, and its
+session-4 entry stays in `LOG.md` as history. The author's choice is this plan's optional
+pocket, so there is nothing to settle.
 
-The author approved this plan's optional pocket on 2026-11-12, after PR #12 was opened, but
-PR #12 didn't come up at the time. **If PR #12 is still open when you start, ask the author
-which ravine they want before building anything.** If it's this one, the author closes PR #12
-(don't close it yourself). That branch's session-4 entry in `LOG.md` also records real
-history (the README poster, and the lesson to push work before testing it), so copy that
-entry into `LOG.md` as written, just above the session-5 entry. The session-5 entry already
-supersedes its "gated" decision.
+One check before you start: if `index.html` contains `with the far side built UP` (PR #12's
+comment above `LEVEL`), its wall is back. Stop and ask the author. This plan's edits would
+still apply on top of it, but everything below was measured without it.
 
 ## What you're building
 

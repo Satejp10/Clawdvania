@@ -141,6 +141,48 @@ Entry format:
   cheapest first use of per-frame holds is the `air` set, which is a single pose today,
   so Clawd looks the same at jump apex as in freefall.
 
+## 2026-09-27 | session 4 | web
+- did: added the V3 Wisps poster to the top of the README, above the title, linked to the
+  game and capped at 480px wide because it is a 1536x2304 portrait. The author first asked
+  for it to replace the title-screen screenshot, then changed that to "put it at the top",
+  so the screenshot stays. Merged as PR #11.
+- broke/fixed: **the ravine was lost once.** It was built and verified after session 3, but
+  plan mode was switched back on before it could be committed, and the container was
+  reclaimed before plan mode lifted. Nothing had been pushed. Rebuilt today to the same
+  layout and committed and pushed *before* any testing. Rule from here: in a cloud session,
+  push a change as soon as it exists, then verify it.
+- did: built the ravine. The third ditch (cols 68-72) keeps its floor, and its far side is
+  built up: col 73 is a 64px face from the ditch floor (y=416) to its top (y=352), with a
+  plateau at y=320 behind it that joins the platform at cols 80-83. Only LEVEL rows 20-23
+  and the comment above LEVEL change; ROOM_H, the camera clamps, solidAt, wallAt, TUNING
+  and WISP_SPOTS are untouched.
+- decided: **built up, not dug down.** Only three rows exist below the walking surface, so
+  digging would mean growing ROOM_H and reworking the camera clamps, parallax and drawn
+  earth. Raising looks the same from the player's side. Cheap to reverse: four LEVEL rows.
+- decided: **gated.** The bench, the cottage door and the last two wisps are past it, so
+  reaching the ending needs the cling or the double jump. This was the stated assumption in
+  the plan the author approved. Making it optional instead (so a player can walk past) is a
+  one-row change.
+- did: verified with the headless physics replica and reachability search, then in the
+  browser. A single jump (measured apex 49.3px) can't cross; the double jump alone and the
+  cling alone each can. Whole level: with abilities, 12/12 wisps plus the bench and the door;
+  without, 10/12 wisps (the ravine wisp and the bench wisp are missing) and neither the bench
+  nor the door. Row 17, the vista perch, is now reachable only with an ability, where before,
+  abilities on and off stood on the same nine rows. Nobody is stranded: all 42 reachable
+  states in the ditch climb back out to the left with no abilities. In the browser: no page
+  errors, ROOM_H 432 and camera max 144 unchanged, and the ending still fires at the door.
+- broke/fixed: a bug in the test harness, not the game. The first version let go of the jump
+  button a few ticks after the first press, which cut every wall kick-off to 40% height and
+  made the cling route look impossible. Traced it frame by frame, fixed the harness and
+  re-ran. The level was never the problem.
+- open: whether the ravine should stay gated (see above).
+- open: `Resources/Clawdvania_Poster_V3_Wisps_cropped.png` (1536x1684, close to square) was
+  uploaded and isn't referenced anywhere yet. It may have been meant as a shorter README
+  poster; not acted on because nobody asked.
+- next: the rest of the proposed "stable" list, which the author still hasn't confirmed:
+  2-3 `air` poses using the per-frame holds, then audit findings 4 and 5 together in the
+  resize/draw path.
+
 ## 2026-11-12 | session 5 | web
 - note: session 4 (2026-09-27) worked on branch `claude/project-audit-nreywo`. Its README
   poster change merged as PR #11, but its log entry sits in draft PR #12, unmerged,
@@ -189,44 +231,33 @@ Entry format:
 - next: the author picks between this plan and PR #12. If it's this plan, close #12, build
   per the plan in the next session, then the author plays it once in a real browser,
   since a feel check is the one thing the checker can't do.
-## 2026-09-27 | session 4 | web
-- did: added the V3 Wisps poster to the top of the README, above the title, linked to the
-  game and capped at 480px wide because it is a 1536x2304 portrait. The author first asked
-  for it to replace the title-screen screenshot, then changed that to "put it at the top",
-  so the screenshot stays. Merged as PR #11.
-- broke/fixed: **the ravine was lost once.** It was built and verified after session 3, but
-  plan mode was switched back on before it could be committed, and the container was
-  reclaimed before plan mode lifted. Nothing had been pushed. Rebuilt today to the same
-  layout and committed and pushed *before* any testing. Rule from here: in a cloud session,
-  push a change as soon as it exists, then verify it.
-- did: built the ravine. The third ditch (cols 68-72) keeps its floor, and its far side is
-  built up: col 73 is a 64px face from the ditch floor (y=416) to its top (y=352), with a
-  plateau at y=320 behind it that joins the platform at cols 80-83. Only LEVEL rows 20-23
-  and the comment above LEVEL change; ROOM_H, the camera clamps, solidAt, wallAt, TUNING
-  and WISP_SPOTS are untouched.
-- decided: **built up, not dug down.** Only three rows exist below the walking surface, so
-  digging would mean growing ROOM_H and reworking the camera clamps, parallax and drawn
-  earth. Raising looks the same from the player's side. Cheap to reverse: four LEVEL rows.
-- decided: **gated.** The bench, the cottage door and the last two wisps are past it, so
-  reaching the ending needs the cling or the double jump. This was the stated assumption in
-  the plan the author approved. Making it optional instead (so a player can walk past) is a
-  one-row change.
-- did: verified with the headless physics replica and reachability search, then in the
-  browser. A single jump (measured apex 49.3px) can't cross; the double jump alone and the
-  cling alone each can. Whole level: with abilities, 12/12 wisps plus the bench and the door;
-  without, 10/12 wisps (the ravine wisp and the bench wisp are missing) and neither the bench
-  nor the door. Row 17, the vista perch, is now reachable only with an ability, where before,
-  abilities on and off stood on the same nine rows. Nobody is stranded: all 42 reachable
-  states in the ditch climb back out to the left with no abilities. In the browser: no page
-  errors, ROOM_H 432 and camera max 144 unchanged, and the ending still fires at the door.
-- broke/fixed: a bug in the test harness, not the game. The first version let go of the jump
-  button a few ticks after the first press, which cut every wall kick-off to 40% height and
-  made the cling route look impossible. Traced it frame by frame, fixed the harness and
-  re-ran. The level was never the problem.
-- open: whether the ravine should stay gated (see above).
-- open: `Resources/Clawdvania_Poster_V3_Wisps_cropped.png` (1536x1684, close to square) was
-  uploaded and isn't referenced anywhere yet. It may have been meant as a shorter README
-  poster; not acted on because nobody asked.
-- next: the rest of the proposed "stable" list, which the author still hasn't confirmed:
-  2-3 `air` poses using the per-frame holds, then audit findings 4 and 5 together in the
-  resize/draw path.
+
+## 2026-11-16 | session 6 | web
+- correction: session 5's entry says session 4's entry sits in draft PR #12, unmerged, and
+  that only one ravine can ship. On 2026-11-16 the author merged PR #12 and then PR #13 a
+  minute apart; merging PR #12 was a mistake (the author said so in chat). The author
+  resolved the `LOG.md` conflict by keeping both sides, which put session 4's entry after
+  session 5's.
+- correction: session 5 and the ravine plan took PR #12's word that its wall gates the bench
+  and the door. It doesn't. On the merged build the checker finds all 12 wisps, the bench
+  and the door with no double jump and no cling, and a replay pins down the route: run off
+  the right end of the floating platform at cols 62-65 (row 20), press jump 1 to 5 ticks
+  after leaving it, and Clawd lands on top of the wall. Jumping from the edge itself drops
+  Clawd into the ditch. Session 4 measured "10/12 without abilities" with its own replica of
+  the physics; the checker runs the game's own code.
+- did: undid PR #12's game change, because the agreed ravine is the optional pocket and the
+  plan was designed and measured on the level without the wall. (The plan's edits do still
+  apply on top of the wall, so nothing would have stopped a build on the wrong level.)
+  `index.html` and `AUDIT.md` are back to commit 02a9725, byte for byte. The live site has
+  had the wall since 16:23 UTC and keeps it until this is merged.
+- did: moved session 4's entry back above session 5's, text unchanged, as the ravine plan
+  asks. It stays because it records real history (the README poster, and the rule to push
+  work before testing it).
+- did: marked the plan's PR #12 question as settled, with a one-line check for the wall.
+- decided: the ravine is the optional pocket in `.claude/context/plans/ravine.md`, not
+  PR #12's wall, because the author called merging PR #12 a mistake.
+- did: verified the fix. The checker passes (4 checks) with the same numbers as before
+  PR #12, and the plan's edits still turn `index.html` into the tested prototype byte for
+  byte.
+- next: build the ravine from the plan in the next session, then the author plays it once
+  in a real browser.
