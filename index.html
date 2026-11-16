@@ -1329,11 +1329,12 @@ function updateLeaves(dt) {
 // Wisps — gentle collectibles that orbit Clawd and follow him home.
 // idle (bobbing in place) -> orbit (collected) -> fly -> lantern (at the eave).
 // ============================================================================
-const WISP_SPOTS = [           // design px centers; last two live on the secret ledge
+const WISP_SPOTS = [           // design px centers; 11-12 live on the secret ledge, 13-15 down the ravine
   [200, 368], [136, 323], [256, 291], [349, 344],
   [624, 275], [712, 320], [765, 357], [1016, 307],
   [1128, 352], [1408, 253],
   [336, 240], [365, 243],
+  [1128, 424], [1032, 488], [952, 440],
 ];
 const wisps = WISP_SPOTS.map(([x, y], i) => ({
   x, y, hx: x, hy: y, state: "idle", i, t: Math.random() * 6.28,
