@@ -230,3 +230,25 @@ Entry format:
 - next: the rest of the proposed "stable" list, which the author still hasn't confirmed:
   2-3 `air` poses using the per-frame holds, then audit findings 4 and 5 together in the
   resize/draw path.
+
+## 2026-11-16 | session 7 | web
+- note: session 6 (the separate session that built the ravine) logged its entry in PR #15,
+  which isn't merged yet, so on `main` this entry follows the misordered session 4. PR #15
+  puts session 4 back in its place.
+- did: found that PR #12 was merged by mistake a minute before PR #13 (the author confirmed
+  it in chat), and that its wall doesn't gate. The checker reaches 12/12 wisps, the bench and
+  the door with no abilities, and a replay through the game's own `updatePlayer` pins down
+  the route: a jump pressed 1-5 ticks after running off the platform at cols 62-65 lands on
+  top of the wall. Session 6 found the same thing independently.
+- did: opened PR #14 to undo the wall. The author closed it unmerged, because PR #15 has the
+  same revert plus the ravine.
+- did: checked PR #15 ahead of the author's merge. Its `index.html` is byte-identical to the
+  prototype verified on 2026-11-12, it boots with 0 page errors, and the checker passes
+  (5 checks) with the plan's numbers.
+- did: generated status report SR-clawdvania-003.
+- broke/fixed: the `project-status` skill's synced template again tells the reading assistant
+  to answer "Section 5's open questions" (they're Section 3). Session 2's fix to the skill
+  didn't last. The report uses Section 3. The skill lives outside this repo, so it isn't
+  fixed here.
+- next: the author play-tests and merges PR #15, then 2-3 `air` poses using the per-frame
+  holds.
