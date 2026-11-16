@@ -201,6 +201,17 @@ const LEVEL = [
 // Parse level
 const ROOM_W = LEVEL[0].length * TILE;
 const ROOM_H = LEVEL.length * TILE;
+// The walk happens in the top 27 rows; everything below them is the ravine.
+// The surface camera still clamps to SURFACE_H, so the walk is framed as it always was.
+const SURFACE_H = 27 * TILE;
+const RAVINE = {
+  x0: 58 * TILE, x1: 73 * TILE,             // inside faces of its outer walls
+  gorgeX0: 68 * TILE, gorgeX1: 73 * TILE,   // the open slot under the ditch
+  lipY: 24 * TILE,                          // the surface line it is cut into
+  floorY: 36 * TILE,                        // its floor
+  panTime: 0.5,                             // s for the camera to tilt down into it, or back up
+};
+RAVINE.camX = (RAVINE.x0 + RAVINE.x1) / 2 - VIEW_W / 2;   // one fixed frame that shows all of it
 let SPAWN = { x: 3 * TILE, y: 13 * TILE };
 for (let r = 0; r < LEVEL.length; r++) {
   if (LEVEL[r].length !== LEVEL[0].length) console.error("LEVEL row " + r + " has length " + LEVEL[r].length + ", expected " + LEVEL[0].length);
@@ -685,7 +696,8 @@ function resetPlayer() {
   player.airJumpsLeft = 0;
   player.fallT = 0; player.ouchT = 0; player.idleT = 0; player.blinkT = 0; player.blinkNext = 3;
   cam.x = clamp(player.x + player.w / 2 - VIEW_W / 2, 0, ROOM_W - VIEW_W);
-  cam.y = clamp(player.y + player.h / 2 - VIEW_H / 2, 0, ROOM_H - VIEW_H);
+  cam.y = clamp(player.y + player.h / 2 - VIEW_H / 2, 0, SURFACE_H - VIEW_H);
+  cam.dive = 0; cam.inRavine = false;
   cam.fx = player.x + player.w / 2;
   cam.fy = player.y + player.h / 2;
 }
@@ -893,7 +905,7 @@ function updatePlayer(dt) {
 // ============================================================================
 // Camera — lerp follow, deadzone, facing lookahead, clamped to room.
 // ============================================================================
-const cam = { x: 0, y: 0, fx: 0, fy: 0 }; // fx/fy = focus point
+const cam = { x: 0, y: 0, fx: 0, fy: 0, dive: 0, inRavine: false }; // fx/fy = focus point; dive = 0 on the surface, 1 settled in the ravine
 let camBias = 0; // extra gaze toward the meadow while sitting on the bench (visual)
 
 function updateCamera() {
@@ -910,8 +922,21 @@ function updateCamera() {
   if (dy > T.camDeadzoneY) cam.fy += dy - T.camDeadzoneY;
   else if (dy < -T.camDeadzoneY) cam.fy += dy + T.camDeadzoneY;
 
-  const targetX = clamp(cam.fx - VIEW_W / 2, 0, ROOM_W - VIEW_W);
-  const targetY = clamp(cam.fy - VIEW_H / 2, 0, ROOM_H - VIEW_H);
+  // The ravine is a fixed-frame room. Below the lip and inside its footprint the camera
+  // stops following and settles on one frame showing the whole pocket and the lips above
+  // it. Leaving needs to be a little more decisive than entering (24px above the lip, or
+  // standing on the surface), so a hop on the top rung doesn't make the frame bob.
+  const pcx = player.x + player.w / 2, feet = player.y + player.h;
+  const inside = pcx > RAVINE.x0 && pcx < RAVINE.x1;
+  if (inside && feet > RAVINE.lipY + 1) cam.inRavine = true;
+  else if (!inside || feet < RAVINE.lipY - 24 || (player.grounded && feet <= RAVINE.lipY)) cam.inRavine = false;
+  cam.dive = clamp(cam.dive + (cam.inRavine ? STEP : -STEP) / RAVINE.panTime, 0, 1);
+  const k = cam.dive * cam.dive * (3 - 2 * cam.dive);   // smoothstep; exactly 0 on the surface
+
+  const surfX = clamp(cam.fx - VIEW_W / 2, 0, ROOM_W - VIEW_W);
+  const surfY = clamp(cam.fy - VIEW_H / 2, 0, SURFACE_H - VIEW_H);
+  const targetX = surfX + (RAVINE.camX - surfX) * k;
+  const targetY = surfY + (ROOM_H - VIEW_H - surfY) * k;
   cam.x += (targetX - cam.x) * T.camLerp;
   cam.y += (targetY - cam.y) * T.camLerp;
   // clamp again so lerp overshoot can never show outside the room
