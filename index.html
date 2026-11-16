@@ -961,6 +961,7 @@ const THEME = {
   earthTop: "#463a52", earthBot: "#2b2338", earthSpeck: "#59462e",
   grass: "#c08a4a", grassGlow: "#eec584", accent: "#c9563f",
   rim: "#54455e", underShade: "#1a1526",
+  hollow: "#120e1c",        // rock behind the roofed parts of the ravine
   leafColors: ["#c9803f", "#a85638", "#d9a05a"],
   leafCount: 80,
   mist: { y: 240, a: 0.10, tint: "#c9a08a" },
@@ -1108,9 +1109,24 @@ const tileCv = makeCanvas(ROOM_W * TILE_SS, ROOM_H * TILE_SS);
   const noAlpha = "rgba(0,0,0,0)";
   for (let ty = 0; ty < LEVEL.length; ty++) {
     for (let tx = 0; tx < LEVEL[0].length; tx++) {
-      if (LEVEL[ty][tx] !== "#") continue;
       const x = tx * TILE, y = ty * TILE;
       const rnd = mulberry32(tx * 971 + ty * 331);
+      if (LEVEL[ty][tx] === ":") {
+        // hollow: open to walk through, but roofed — paint the rock behind it so the
+        // sky doesn't show through the hillside. Darker than the earth in front of it.
+        c.fillStyle = THEME.hollow;
+        c.fillRect(x, y, TILE, TILE);
+        c.globalAlpha = 0.16;
+        for (let i = 0; i < 2; i++) {
+          c.fillStyle = rnd() < 0.5 ? THEME.earthBot : "#0d0a16";
+          c.beginPath();
+          c.arc(x + rnd() * TILE, y + rnd() * TILE, 3 + rnd() * 4, 0, 6.29);
+          c.fill();
+        }
+        c.globalAlpha = 1;
+        continue;
+      }
+      if (LEVEL[ty][tx] !== "#") continue;
       const openAbove = !solidAt(x, y - TILE);
       const openBelow = !solidAt(x, y + TILE);
       const openL = !solidAt(x - TILE, y);
