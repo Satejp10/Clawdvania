@@ -139,12 +139,20 @@ const GRAV_RISE = 2 * APEX_PX / (TUNING.timeToApex * TUNING.timeToApex);
 const JUMP_VEL  = 2 * APEX_PX / TUNING.timeToApex;
 
 // ============================================================================
-// Level — array of strings, 1 char per tile. '#' solid, '.' empty, 'P' spawn.
-// 112 wide x 27 tall. Cols 89-110: the homecoming meadow (cottage is drawn art,
-// not tiles). Row 16 cols 20-23: secret ledge. Perch at 85-88 is the vista bench.
-// The gaps in rows 24-25 are ditches, not pits: the last row is solid all the
-// way across, so they bottom out in drawn earth two tiles down. Step in, hop out
-// (or cling your way up the side).
+// Level — array of strings, 1 char per tile. '#' solid, '.' empty, 'P' spawn,
+// ':' hollow (empty, but roofed: the baker paints rock behind it so the sky
+// doesn't show through the hillside).
+// 112 wide x 38 tall. The walk is rows 0-26; rows 26-37 are the ravine.
+// Cols 89-110: the homecoming meadow (cottage is drawn art, not tiles).
+// Row 16 cols 20-23: secret ledge. Perch at 85-88 is the vista bench.
+// The first two gaps in rows 24-25 are ditches, not pits: row 26 is solid under
+// them, so they bottom out in drawn earth two tiles down. Step in, hop out (or
+// cling your way up the side).
+// The third gap (cols 68-72) is the mouth of the ravine, an optional side pocket
+// under the walk. The gorge drops to a floor at row 36, with one-tile rungs on
+// alternating walls every two rows, so plain jumps climb back out. Off its left
+// side, through a door at col 67 rows 34-35, are two roofed hollows: a grotto
+// (cols 62-66) and a three-wide chimney (cols 58-60). See RAVINE below.
 // Cols 0 and 111 are empty above the floor: solidAt already bounds the room, so
 // tiles there only baked into dark pillars standing in the sky. The floor rows
 // keep theirs — blanking those would open a one-tile well at each end.
@@ -176,6 +184,17 @@ const LEVEL = [
   "...P..........................####..........##.............##...................................................",
   "####################....######################....##################.....#######################################",
   "####################....######################....##################.....#######################################",
+  "####################################################################....########################################",
+  "##########################################################:::#######.....#######################################",
+  "##########################################################:::########....#######################################",
+  "##########################################################:::#######.....#######################################",
+  "##########################################################:::#:::::#....########################################",
+  "##########################################################:::#:::::#.....#######################################",
+  "##########################################################:::#:::::##....#######################################",
+  "##########################################################:::::::::#.....#######################################",
+  "##########################################################::::::::::....########################################",
+  "##########################################################::::::::::....########################################",
+  "################################################################################################################",
   "################################################################################################################",
 ];
 
