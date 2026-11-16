@@ -1322,7 +1322,7 @@ const leaves = [];
 {
   const rnd = mulberry32(777);
   for (let i = 0; i < THEME.leafCount; i++) leaves.push({
-    x: rnd() * ROOM_W, y: rnd() * ROOM_H,
+    x: rnd() * ROOM_W, y: rnd() * SURFACE_H,
     vy: 8 + rnd() * 14, ph: rnd() * 6.28, sp: 0.5 + rnd(),
     rot: rnd() * 6.28, rotSp: (rnd() - 0.5) * 2,
     a: 0.55 + rnd() * 0.4,
@@ -1335,7 +1335,10 @@ function updateLeaves(dt) {
     m.rot += m.rotSp * dt;
     m.x += Math.sin(m.ph) * 12 * dt;
     m.y += m.vy * dt;
-    if (m.y > ROOM_H + 8) { m.y = -8; m.x = Math.random() * ROOM_W; }
+    // Leaves fall through the surface band. Below it only the ones over the open gorge
+    // keep going, so they drift down the gap instead of across solid rock.
+    const bottom = (m.x > RAVINE.gorgeX0 && m.x < RAVINE.gorgeX1) ? RAVINE.floorY : SURFACE_H;
+    if (m.y > bottom + 8) { m.y = -8; m.x = Math.random() * ROOM_W; }
     if (m.x < -8) m.x += ROOM_W;
     if (m.x > ROOM_W + 8) m.x -= ROOM_W;
   }
