@@ -208,16 +208,28 @@ softens it slightly.
 - **Finding 4** — fractional render scale makes Clawd's pixels uneven.
 - **Finding 5** — `devicePixelRatio` is uncapped.
 - The smaller notes above that aren't struck through.
-- ~~**The abilities have nowhere to matter — now doubly so.**~~ ✅ **Resolved by the ravine.**
+- ~~**The abilities have nowhere to matter — now doubly so.**~~ ✅ **Resolved by the ravine**
+  (2026-11-16), after a first attempt that didn't do what it claimed.
 
-  > The third ditch (cols 68–72) keeps its floor, and its far side is now built up: col 73 is a
-  > 64px face from the ditch floor (y=416) to its top (y=352), with a plateau at y=320 behind it.
-  > Re-measured with the same reachability search: a single jump (49.3px apex) can't clear it,
-  > while the double jump alone and the cling alone each can. With no abilities you now reach
-  > 10/12 wisps and neither the bench nor the door. Row 17, the vista perch, is stood on only with
-  > an ability, where before, abilities on and off stood on the same nine rows. Nobody is stranded:
-  > all 42 reachable states in the ditch climb back out to the left with no abilities. Kept below
-  > for the record.
+  > **Fixed by an optional pocket dug under the third ditch** (`.claude/context/plans/ravine.md`):
+  > an open gorge with one-tile rungs to climb back out by, and two roofed hollows off its left
+  > side. Measured with `node tools/verify.js --baseline <pre-ravine build> --deep`, which runs
+  > the game's own `updatePlayer`: plain running and jumping collects **13 of 15** wisps, the
+  > double jump **14** and the cling all **15**, and every ability set reaches the bench and the
+  > door. From all **714** places Clawd can stand, plain running and jumping still gets home,
+  > and still does with jump and run cut to 85%. Trying every input on every tick inside the
+  > hollows, plain moves get no closer than **32px** to wisp 14, and the double jump
+  > alone no closer than **44px** to wisp 15, against a 15px pickup. Each ability now opens
+  > something plain running and jumping can't reach, and neither is needed to finish.
+  >
+  > **Correction.** The first attempt (PR #12, merged 2026-11-16 and taken out the same day)
+  > raised the far side of the ditch into a 64px wall, and this note said that made an ability
+  > necessary: "a single jump (49.3px apex) can't clear it" and "with no abilities you now reach
+  > 10/12 wisps and neither the bench nor the door". That was wrong. A running jump pressed 2–6
+  > frames after leaving the left ledge, inside the 100ms coyote window, lands on the corner of
+  > col 73 and carries on to the bench and the door. The search behind those numbers ran a
+  > hand-written copy of the physics and never found that jump; `tools/verify.js` did. Kept
+  > below for the record.
 
   With the boundary columns gone, the
   tallest grabbable faces in the level are the two-column tower at 44–45 and the platform edges,

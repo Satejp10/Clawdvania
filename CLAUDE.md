@@ -32,8 +32,8 @@ Live at https://satejp10.github.io/Clawdvania/ (GitHub Pages, served from
 
 **Scope, decided 2026-08-01:** it's a **portfolio piece**, so when polish and content
 compete, polish wins. It stays a **five-minute vignette** — the agreed vertical addition
-is *one* ravine, not a second area. It's planned as an optional pocket under the third
-ditch, step by step, in `.claude/context/plans/ravine.md`. "One file" is locked, but data
+is *one* ravine, not a second area. It's built (2026-11-16): an optional pocket under the
+third ditch, per `.claude/context/plans/ravine.md`. "One file" is locked, but data
 URIs satisfy it, so that constraint doesn't block asset-shaped work. Proposed and not yet
 confirmed: no fail state, no timer or score, no backtracking.
 

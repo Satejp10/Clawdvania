@@ -1,5 +1,10 @@
 # Ravine: build plan
 
+**Status (2026-11-16): built.** Applied exactly as written below, after reverting PR #12's
+raised wall, which had been merged the same day. Every checker gate matched the expected
+output given here. The rest of this file is kept as the record of how and why; `LOG.md`,
+session 6, has the details.
+
 **Status (2026-11-12):** designed, prototyped in a scratch copy of the game and verified by
 simulation. **Not built.** `index.html` is untouched. This file is the hand-off: work through
 it from top to bottom.
