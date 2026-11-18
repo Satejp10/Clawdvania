@@ -58,6 +58,13 @@
   #rotate .phone { font-size: 64px; display: inline-block; animation: tilt 1.6s ease-in-out infinite; }
   @keyframes tilt { 0%, 25% { transform: rotate(0deg); } 60%, 100% { transform: rotate(90deg); } }
   body.portrait-touch #rotate { display: block; }
+
+  /* --- build version, bottom-right; the same number is in README.md --- */
+  #build-version { position: fixed; right: 10px; bottom: 8px; z-index: 6; pointer-events: none;
+                   padding: 2px 7px; border-radius: 6px; background: rgba(26,21,38,0.55);
+                   color: rgba(238,197,132,0.85); font: 12px/1.4 system-ui, sans-serif;
+                   letter-spacing: 0.04em; user-select: none; }
+  #touch.on ~ #build-version { display: none; }  /* touch screens: the jump button sits in this corner */
 </style>
 </head>
 <body>
@@ -67,6 +74,7 @@
   <div class="tbtn" id="tRight"><svg viewBox="0 0 24 24"><path d="M8.5 4.5 16 12l-7.5 7.5-1.8-1.8L12.4 12 6.7 6.3z"/></svg></div>
   <div class="tbtn" id="tJump"><svg viewBox="0 0 24 24"><path d="M12 4l6.5 6.5-1.8 1.8L13 8.6V20h-2V8.6l-3.7 3.7-1.8-1.8z"/></svg></div>
 </div>
+<div id="build-version">v0.1</div>
 <div id="rotate"><div class="inner">
   <div class="phone">📱</div>
   <div style="margin-top:14px;font-size:18px;font-weight:600">Rotate your device</div>

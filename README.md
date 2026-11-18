@@ -56,4 +56,6 @@ The gaps in the ground are **ditches, not pits**: the first two bottom out in ea
 
 ## Status
 
+**Version 0.1**, shown in the bottom-right corner of the game.
+
 The walk home is complete: title, wisps, an optional ravine, deepening dusk, bench vista, ending, and fully synthesized audio (wind, footsteps, pentatonic chimes, an ending swell) — still one file, zero assets. Feel-tuning continues; whatever comes after the walk comes later.
