@@ -44,7 +44,7 @@ press still lifts you — and the best time to use it is right at the top of the
 takes a 49px hop to **85px**. You get it back by landing *or* by catching a wall, so a
 cling-and-kick chain never strands you without one.
 
-There are **12 wisps** on the way home. Two are somewhere you'd only look if you were curious. Standing still in the right spot opens a view.
+There are **15 wisps** on the way home. Two are somewhere you'd only look if you were curious, and three are down the ravine under the third ditch: one for anybody, one for the double jump and one for the cling. Standing still in the right spot opens a view.
 
 **Mobile:** on-screen arrows + jump button appear automatically on touch devices (variable jump height works there too). The game plays in landscape — portrait shows a rotate prompt.
 
@@ -52,8 +52,10 @@ There are **12 wisps** on the way home. Two are somewhere you'd only look if you
 
 All movement constants live in the `TUNING` object at the top of `index.html`: run acceleration, jump apex/time, asymmetric gravity, variable jump height, **100ms coyote time**, **120ms jump buffer**, camera lerp/deadzone/lookahead. The cling has its own block — slide speed, kick-off push, a **130ms** input lock after a kick-off so you actually clear the wall, and **90ms of wall coyote** so sliding past the end of a wall doesn't cost you the jump. The double jump is two more: how many air jumps you get between wall/ground touches, and how strong the second beat is against the first. Fixed-timestep simulation at 60Hz.
 
-The gaps in the ground are **ditches, not pits** — they bottom out in earth two tiles down. Step in and hop out, or cling your way up the side.
+The gaps in the ground are **ditches, not pits**: the first two bottom out in earth two tiles down, so step in and hop out, or cling your way up the side. The third opens into a ravine with ledges to climb back out by, and nothing down there can trap you.
 
 ## Status
 
-The walk home is complete: title, wisps, deepening dusk, bench vista, ending, and fully synthesized audio (wind, footsteps, pentatonic chimes, an ending swell) — still one file, zero assets. Feel-tuning continues; whatever comes after the walk comes later.
+**Version 0.1**, shown in the bottom-right corner of the game.
+
+The walk home is complete: title, wisps, an optional ravine, deepening dusk, bench vista, ending, and fully synthesized audio (wind, footsteps, pentatonic chimes, an ending swell) — still one file, zero assets. Feel-tuning continues; whatever comes after the walk comes later.

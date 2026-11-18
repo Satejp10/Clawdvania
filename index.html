@@ -58,6 +58,13 @@
   #rotate .phone { font-size: 64px; display: inline-block; animation: tilt 1.6s ease-in-out infinite; }
   @keyframes tilt { 0%, 25% { transform: rotate(0deg); } 60%, 100% { transform: rotate(90deg); } }
   body.portrait-touch #rotate { display: block; }
+
+  /* --- build version, bottom-right; the same number is in README.md --- */
+  #build-version { position: fixed; right: 10px; bottom: 8px; z-index: 6; pointer-events: none;
+                   padding: 2px 7px; border-radius: 6px; background: rgba(26,21,38,0.55);
+                   color: rgba(238,197,132,0.85); font: 12px/1.4 system-ui, sans-serif;
+                   letter-spacing: 0.04em; user-select: none; }
+  #touch.on ~ #build-version { display: none; }  /* touch screens: the jump button sits in this corner */
 </style>
 </head>
 <body>
@@ -67,6 +74,7 @@
   <div class="tbtn" id="tRight"><svg viewBox="0 0 24 24"><path d="M8.5 4.5 16 12l-7.5 7.5-1.8-1.8L12.4 12 6.7 6.3z"/></svg></div>
   <div class="tbtn" id="tJump"><svg viewBox="0 0 24 24"><path d="M12 4l6.5 6.5-1.8 1.8L13 8.6V20h-2V8.6l-3.7 3.7-1.8-1.8z"/></svg></div>
 </div>
+<div id="build-version">v0.1</div>
 <div id="rotate"><div class="inner">
   <div class="phone">📱</div>
   <div style="margin-top:14px;font-size:18px;font-weight:600">Rotate your device</div>
@@ -139,24 +147,23 @@ const GRAV_RISE = 2 * APEX_PX / (TUNING.timeToApex * TUNING.timeToApex);
 const JUMP_VEL  = 2 * APEX_PX / TUNING.timeToApex;
 
 // ============================================================================
-// Level — array of strings, 1 char per tile. '#' solid, '.' empty, 'P' spawn.
-// 112 wide x 27 tall. Cols 89-110: the homecoming meadow (cottage is drawn art,
-// not tiles). Row 16 cols 20-23: secret ledge. Perch at 85-88 is the vista bench.
-// The gaps in rows 24-25 are ditches, not pits: the last row is solid all the
-// way across, so they bottom out in drawn earth two tiles down. Step in, hop out
-// (or cling your way up the side).
+// Level — array of strings, 1 char per tile. '#' solid, '.' empty, 'P' spawn,
+// ':' hollow (empty, but roofed: the baker paints rock behind it so the sky
+// doesn't show through the hillside).
+// 112 wide x 38 tall. The walk is rows 0-26; rows 26-37 are the ravine.
+// Cols 89-110: the homecoming meadow (cottage is drawn art, not tiles).
+// Row 16 cols 20-23: secret ledge. Perch at 85-88 is the vista bench.
+// The first two gaps in rows 24-25 are ditches, not pits: row 26 is solid under
+// them, so they bottom out in drawn earth two tiles down. Step in, hop out (or
+// cling your way up the side).
+// The third gap (cols 68-72) is the mouth of the ravine, an optional side pocket
+// under the walk. The gorge drops to a floor at row 36, with one-tile rungs on
+// alternating walls every two rows, so plain jumps climb back out. Off its left
+// side, through a door at col 67 rows 34-35, are two roofed hollows: a grotto
+// (cols 62-66) and a three-wide chimney (cols 58-60). See RAVINE below.
 // Cols 0 and 111 are empty above the floor: solidAt already bounds the room, so
 // tiles there only baked into dark pillars standing in the sky. The floor rows
 // keep theirs — blanking those would open a one-tile well at each end.
-// The ravine is the third ditch (cols 68-72) with the far side built UP rather
-// than the floor dug down — there are only three rows below the walking surface,
-// so digging would mean growing ROOM_H and reworking the camera clamps, the
-// parallax and the drawn earth. Raising reads the same from the player's seat.
-// Col 73 is a clean 64px face from the ditch floor (y=416) to its top (y=352):
-// too tall for a single jump (49.3px apex), clearable by one double jump or a
-// cling-and-kick. That is the whole point — it is the first place in the level
-// where either ability is load-bearing. You can always hop back out to the LEFT
-// (32px), so failing the climb strands nobody.
 // ============================================================================
 const LEVEL = [
   "................................................................................................................",
@@ -179,18 +186,40 @@ const LEVEL = [
   ".....................................................................................####.......................",
   ".....................................#####......................................................................",
   "..............#####.............................................................................................",
-  "..................................###.........................####........##########............................",
-  "......#####.................................##......###...................######................................",
-  "..............................####..........##.............##............#######................................",
-  "...P..........................####..........##.............##............#######................................",
+  "..................................###.........................####..............####............................",
+  "......#####.................................##......###.........................................................",
+  "..............................####..........##.............##.............####..................................",
+  "...P..........................####..........##.............##...................................................",
   "####################....######################....##################.....#######################################",
   "####################....######################....##################.....#######################################",
+  "####################################################################....########################################",
+  "##########################################################:::#######.....#######################################",
+  "##########################################################:::########....#######################################",
+  "##########################################################:::#######.....#######################################",
+  "##########################################################:::#:::::#....########################################",
+  "##########################################################:::#:::::#.....#######################################",
+  "##########################################################:::#:::::##....#######################################",
+  "##########################################################:::::::::#.....#######################################",
+  "##########################################################::::::::::....########################################",
+  "##########################################################::::::::::....########################################",
+  "################################################################################################################",
   "################################################################################################################",
 ];
 
 // Parse level
 const ROOM_W = LEVEL[0].length * TILE;
 const ROOM_H = LEVEL.length * TILE;
+// The walk happens in the top 27 rows; everything below them is the ravine.
+// The surface camera still clamps to SURFACE_H, so the walk is framed as it always was.
+const SURFACE_H = 27 * TILE;
+const RAVINE = {
+  x0: 58 * TILE, x1: 73 * TILE,             // inside faces of its outer walls
+  gorgeX0: 68 * TILE, gorgeX1: 73 * TILE,   // the open slot under the ditch
+  lipY: 24 * TILE,                          // the surface line it is cut into
+  floorY: 36 * TILE,                        // its floor
+  panTime: 0.5,                             // s for the camera to tilt down into it, or back up
+};
+RAVINE.camX = (RAVINE.x0 + RAVINE.x1) / 2 - VIEW_W / 2;   // one fixed frame that shows all of it
 let SPAWN = { x: 3 * TILE, y: 13 * TILE };
 for (let r = 0; r < LEVEL.length; r++) {
   if (LEVEL[r].length !== LEVEL[0].length) console.error("LEVEL row " + r + " has length " + LEVEL[r].length + ", expected " + LEVEL[0].length);
@@ -675,7 +704,8 @@ function resetPlayer() {
   player.airJumpsLeft = 0;
   player.fallT = 0; player.ouchT = 0; player.idleT = 0; player.blinkT = 0; player.blinkNext = 3;
   cam.x = clamp(player.x + player.w / 2 - VIEW_W / 2, 0, ROOM_W - VIEW_W);
-  cam.y = clamp(player.y + player.h / 2 - VIEW_H / 2, 0, ROOM_H - VIEW_H);
+  cam.y = clamp(player.y + player.h / 2 - VIEW_H / 2, 0, SURFACE_H - VIEW_H);
+  cam.dive = 0; cam.inRavine = false;
   cam.fx = player.x + player.w / 2;
   cam.fy = player.y + player.h / 2;
 }
@@ -883,7 +913,7 @@ function updatePlayer(dt) {
 // ============================================================================
 // Camera — lerp follow, deadzone, facing lookahead, clamped to room.
 // ============================================================================
-const cam = { x: 0, y: 0, fx: 0, fy: 0 }; // fx/fy = focus point
+const cam = { x: 0, y: 0, fx: 0, fy: 0, dive: 0, inRavine: false }; // fx/fy = focus point; dive = 0 on the surface, 1 settled in the ravine
 let camBias = 0; // extra gaze toward the meadow while sitting on the bench (visual)
 
 function updateCamera() {
@@ -900,8 +930,21 @@ function updateCamera() {
   if (dy > T.camDeadzoneY) cam.fy += dy - T.camDeadzoneY;
   else if (dy < -T.camDeadzoneY) cam.fy += dy + T.camDeadzoneY;
 
-  const targetX = clamp(cam.fx - VIEW_W / 2, 0, ROOM_W - VIEW_W);
-  const targetY = clamp(cam.fy - VIEW_H / 2, 0, ROOM_H - VIEW_H);
+  // The ravine is a fixed-frame room. Below the lip and inside its footprint the camera
+  // stops following and settles on one frame showing the whole pocket and the lips above
+  // it. Leaving needs to be a little more decisive than entering (24px above the lip, or
+  // standing on the surface), so a hop on the top rung doesn't make the frame bob.
+  const pcx = player.x + player.w / 2, feet = player.y + player.h;
+  const inside = pcx > RAVINE.x0 && pcx < RAVINE.x1;
+  if (inside && feet > RAVINE.lipY + 1) cam.inRavine = true;
+  else if (!inside || feet < RAVINE.lipY - 24 || (player.grounded && feet <= RAVINE.lipY)) cam.inRavine = false;
+  cam.dive = clamp(cam.dive + (cam.inRavine ? STEP : -STEP) / RAVINE.panTime, 0, 1);
+  const k = cam.dive * cam.dive * (3 - 2 * cam.dive);   // smoothstep; exactly 0 on the surface
+
+  const surfX = clamp(cam.fx - VIEW_W / 2, 0, ROOM_W - VIEW_W);
+  const surfY = clamp(cam.fy - VIEW_H / 2, 0, SURFACE_H - VIEW_H);
+  const targetX = surfX + (RAVINE.camX - surfX) * k;
+  const targetY = surfY + (ROOM_H - VIEW_H - surfY) * k;
   cam.x += (targetX - cam.x) * T.camLerp;
   cam.y += (targetY - cam.y) * T.camLerp;
   // clamp again so lerp overshoot can never show outside the room
@@ -926,6 +969,7 @@ const THEME = {
   earthTop: "#463a52", earthBot: "#2b2338", earthSpeck: "#59462e",
   grass: "#c08a4a", grassGlow: "#eec584", accent: "#c9563f",
   rim: "#54455e", underShade: "#1a1526",
+  hollow: "#120e1c",        // rock behind the roofed parts of the ravine
   leafColors: ["#c9803f", "#a85638", "#d9a05a"],
   leafCount: 80,
   mist: { y: 240, a: 0.10, tint: "#c9a08a" },
@@ -1073,9 +1117,24 @@ const tileCv = makeCanvas(ROOM_W * TILE_SS, ROOM_H * TILE_SS);
   const noAlpha = "rgba(0,0,0,0)";
   for (let ty = 0; ty < LEVEL.length; ty++) {
     for (let tx = 0; tx < LEVEL[0].length; tx++) {
-      if (LEVEL[ty][tx] !== "#") continue;
       const x = tx * TILE, y = ty * TILE;
       const rnd = mulberry32(tx * 971 + ty * 331);
+      if (LEVEL[ty][tx] === ":") {
+        // hollow: open to walk through, but roofed — paint the rock behind it so the
+        // sky doesn't show through the hillside. Darker than the earth in front of it.
+        c.fillStyle = THEME.hollow;
+        c.fillRect(x, y, TILE, TILE);
+        c.globalAlpha = 0.16;
+        for (let i = 0; i < 2; i++) {
+          c.fillStyle = rnd() < 0.5 ? THEME.earthBot : "#0d0a16";
+          c.beginPath();
+          c.arc(x + rnd() * TILE, y + rnd() * TILE, 3 + rnd() * 4, 0, 6.29);
+          c.fill();
+        }
+        c.globalAlpha = 1;
+        continue;
+      }
+      if (LEVEL[ty][tx] !== "#") continue;
       const openAbove = !solidAt(x, y - TILE);
       const openBelow = !solidAt(x, y + TILE);
       const openL = !solidAt(x - TILE, y);
@@ -1271,7 +1330,7 @@ const leaves = [];
 {
   const rnd = mulberry32(777);
   for (let i = 0; i < THEME.leafCount; i++) leaves.push({
-    x: rnd() * ROOM_W, y: rnd() * ROOM_H,
+    x: rnd() * ROOM_W, y: rnd() * SURFACE_H,
     vy: 8 + rnd() * 14, ph: rnd() * 6.28, sp: 0.5 + rnd(),
     rot: rnd() * 6.28, rotSp: (rnd() - 0.5) * 2,
     a: 0.55 + rnd() * 0.4,
@@ -1284,7 +1343,10 @@ function updateLeaves(dt) {
     m.rot += m.rotSp * dt;
     m.x += Math.sin(m.ph) * 12 * dt;
     m.y += m.vy * dt;
-    if (m.y > ROOM_H + 8) { m.y = -8; m.x = Math.random() * ROOM_W; }
+    // Leaves fall through the surface band. Below it only the ones over the open gorge
+    // keep going, so they drift down the gap instead of across solid rock.
+    const bottom = (m.x > RAVINE.gorgeX0 && m.x < RAVINE.gorgeX1) ? RAVINE.floorY : SURFACE_H;
+    if (m.y > bottom + 8) { m.y = -8; m.x = Math.random() * ROOM_W; }
     if (m.x < -8) m.x += ROOM_W;
     if (m.x > ROOM_W + 8) m.x -= ROOM_W;
   }
@@ -1294,11 +1356,12 @@ function updateLeaves(dt) {
 // Wisps — gentle collectibles that orbit Clawd and follow him home.
 // idle (bobbing in place) -> orbit (collected) -> fly -> lantern (at the eave).
 // ============================================================================
-const WISP_SPOTS = [           // design px centers; last two live on the secret ledge
+const WISP_SPOTS = [           // design px centers; 11-12 live on the secret ledge, 13-15 down the ravine
   [200, 368], [136, 323], [256, 291], [349, 344],
   [624, 275], [712, 320], [765, 357], [1016, 307],
   [1128, 352], [1408, 253],
   [336, 240], [365, 243],
+  [1128, 424], [1032, 488], [952, 440],
 ];
 const wisps = WISP_SPOTS.map(([x, y], i) => ({
   x, y, hx: x, hy: y, state: "idle", i, t: Math.random() * 6.28,
