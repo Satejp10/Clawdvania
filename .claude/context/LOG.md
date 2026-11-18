@@ -293,3 +293,26 @@ Entry format:
   fixed here.
 - next: the author play-tests and merges PR #15, then 2-3 `air` poses using the per-frame
   holds.
+
+## 2026-11-18 | session 8 | web
+- note: Satejp10/Clawdvania#15 was merged into `main` at 07:39 UTC (merge `d86870f`). The live
+  page now matches `main` (SHA-1 `b7414f33…`) and shows the v0.1 label. Pages serves `main`
+  only, so the branch's own page showed the old build until the merge. The author downloaded
+  the branch's `index.html` to see v0.1 first.
+- did: the author played the ravine and said it "seems to be working" [logged: 2026-11-18].
+- did: re-ran `node tools/verify.js` on the merged file: PASS (5 checks), 70.7 s.
+- did: generated status report SR-clawdvania-004. It supersedes SR-clawdvania-003, whose
+  acceptance SHA (`f58a71e2…`) is stale. `main` is `b7414f33…`.
+- decided: the version label is a hand-edited constant in two places, `#build-version` in
+  `index.html` and the README's Status line, because there is no build step to stamp it.
+- rejected: a generated version stamp, because the project has no build step.
+- decided: hide the label on touch-capable devices, because the touch jump button sits in the
+  same corner.
+- rejected: showing the label on touch screens, because it covers the jump button. Side
+  effect: touch-screen laptops also hide it.
+- broke/fixed: nothing broken.
+- open: the four-item "stable" list is unconfirmed. So are "no fail state, no timer or score,
+  no backtracking", and the purpose of `Resources/Clawdvania_Poster_V3_Wisps_cropped.png`,
+  which nothing references.
+- next: the author decides the "stable" list. If it is accepted, build item 2: 2–3 `air`
+  poses on the per-frame holds.
