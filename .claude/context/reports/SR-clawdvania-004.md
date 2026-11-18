@@ -12,7 +12,7 @@ surface: claude code web
 session_id: session_01JgeXKD2eCpPL1LkiLC2Zrx
 project_started: 2026-07-13
 days_active: 13                  # distinct commit dates on main
-total_commits: 51                # on this branch, including this report's commit (main has 50)
+total_commits: 52                # on this branch at HEAD (main has 50)
 commits_since_last_report: 11    # on main, since SR-clawdvania-003's commit (e85c01e)
 previous_report: SR-clawdvania-003 (2026-11-16)
 previous_report_delivered_to_chat: unknown
@@ -38,7 +38,7 @@ standalone: true
 **Shipped (live on `main`):**
 - **The ravine.** An optional pocket under the third ditch (cols 68–72), going down to a floor at row 36. Three new wisps, so 15 in all. Wisp 13 is free and visible from the surface. Wisp 14 needs the double jump (or the cling). Wisp 15 needs the cling. Plain running and jumping still reaches the bench and the door. `[verified: node tools/verify.js on the merged file]`
 - **The v0.1 label.** A small pill at the bottom-right of the game, hidden on touch-capable devices. The same version is in the README's Status section. `[verified: origin/main index.html lines 63–77; README line 59; live URL]`
-- **The wall is gone.** Column 73 is open in rows 17–23, where the raised 64 px face from Satejp10/Clawdvania#12 used to be. `[verified: level rows read from origin/main's index.html]`
+- **The wall is gone.** Column 73 is open from the top of the room down to row 23. The raised face from Satejp10/Clawdvania#12 used to sit there. `[verified: level rows read from origin/main's index.html]`
 - **Log order.** Sessions 1–7 are in order on `main`. `[verified: grep "^## " on origin/main's LOG.md]`
 - **Docs.** AUDIT.md and CLAUDE.md describe the built ravine. The old note that said the wall gated the walk is corrected. `[logged: Satejp10/Clawdvania#15 description]`
 
@@ -120,7 +120,7 @@ standalone: true
 | One fixed camera frame for the ravine, with a 0.5 s tilt | 2026-11-12 | A follow camera sways during wall kicks and drops Clawd off-screen in a plunge | A follow camera | Cheap |
 | The way out uses only plain jumps (rungs every 32 px) | 2026-11-12 | An optional pocket must never trap a player who lacks a skill | Requiring an ability to climb out | Cheap |
 | Reachability claims come from `tools/verify.js`, which runs the game's own code | 2026-11-12 | A hand-written replica reported the wall as a gate, but a coyote jump clears it | Replicas of the physics; eyeballing | Cheap |
-| Remove the wall through Satejp10/Clawdvania#15 and close Satejp10/Clawdvania#14 | 2026-11-16 | Satejp10/Clawdvania#15 has the same revert plus the ravine: one merge, no conflicts | Merging Satejp10/Clawdvania#14 first, which left two conflicts in #15 | Cheap |
+| Remove the wall through Satejp10/Clawdvania#15 and close Satejp10/Clawdvania#14 | 2026-11-16 | Satejp10/Clawdvania#15 has the same revert plus the ravine: one merge, no conflicts | Merging Satejp10/Clawdvania#14 first, which left two conflicts in Satejp10/Clawdvania#15 | Cheap |
 | Per-frame sprite durations shipped with no holds set | 2026-08-01 | Keeps the mechanism separate from the taste call about which frames to hold | Shipping both together | Cheap |
 | v0.1 label, bottom-right, hidden on touch-capable devices | 2026-11-18 | The author asked for a visible version number so builds can be told apart when testing. On touch screens the jump button sits in that corner. | A README-only version (not visible in the game); showing the label on touch screens (it covers the jump button) | Cheap |
 | The version is a hand-edited constant in two places: `#build-version` in `index.html` and the README's Status line | 2026-11-18 (Claude's choice; the author merged it) | The project has no build step that could stamp a version | A generated build stamp, which needs a build step | Cheap |
