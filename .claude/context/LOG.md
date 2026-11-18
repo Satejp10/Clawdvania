@@ -316,3 +316,15 @@ Entry format:
   which nothing references.
 - next: the author decides the "stable" list. If it is accepted, build item 2: 2–3 `air`
   poses on the per-frame holds.
+
+## 2026-11-18 | session 9 | web
+- did: researched recent Claude-made browser demos: a GitHub list of about 2,800 posted works (480 of them games), plus a few game write-ups. The videos were not watched. Notes saved to Box under Claude/Clawdvania, not to the repo. No game code changed.
+- did: checked before writing: `node tools/verify.js` PASS (5 checks, 52.3 s); the live page's SHA-1 equals `main`'s `index.html`; no open pull requests.
+- did: generated status report `.claude/context/reports/SR-clawdvania-005.md`, which supersedes SR-clawdvania-004.
+- decided: proposed, not yet confirmed by the author. The first visual step is a Canvas 2D poster pass, and WebGL only if that falls short. The game already draws glow in Canvas and the poster gaps are Canvas-sized, so this is the cheapest test of whether WebGL is needed.
+- rejected: a WebGL rewrite as the first step, because it is the most expensive path and the Canvas route has not been tried. Also rejected: a 3D rewrite in the style of the viral demos, because it would be a different game (no painted world, no pixel crab).
+- correction: the chat answer today said most of the demos are WebGL/GLSL and called one tip "widely shared." The first was a guess from titles, not a count, and the tip came from one post. The Box overhaul note repeats both; report 005 supersedes it.
+- correction: the chat answer said Canvas 2D "can only fake light." The game already uses additive Canvas glow, so that was too strong.
+- broke/fixed: nothing broken.
+- open: whether the author accepts the four-item "stable" list; whether "no fail state, no timer or score, no backtracking" is confirmed; whether the poster pass goes in before "stable".
+- next: the author answers the three questions in report 005. If the poster pass is approved, build it as one change, checked with `--baseline` against `ae83d91`. If not, the air poses wait on the stable list.
