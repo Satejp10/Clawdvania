@@ -60,3 +60,7 @@ Things worth knowing before changing it:
   handled in `solidAt`; don't add boundary tiles to `LEVEL` to compensate.
 
 `AUDIT.md` tracks known issues and what's still open.
+
+`.claude/context/FEATURES.md` lists every feature: built, planned, ideas and ruled out.
+When a feature changes state, or the owner suggests a new one, update it in the same
+commit.
