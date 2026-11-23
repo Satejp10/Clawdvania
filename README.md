@@ -16,7 +16,7 @@ No install, no build step, nothing to download — it's one HTML file.
 
 **Single self-contained `index.html`.** Vanilla JS + Canvas 2D. No engine, no build step, no asset files — Clawd is an inline pixel-array sprite and the world is entirely procedural. Open the file in a browser and play.
 
-**Look:** a painterly *Autumn Dusk* atmosphere (gradient sky, god rays, parallax hills and trees, drifting leaves, soft turf) rendered smooth at the display's native resolution (HiDPI/`devicePixelRatio`-aware, so it's crisp — not pixelated — at any zoom). Clawd himself stays crisp pixel art as a deliberate contrast.
+**Look:** a painterly *Autumn Dusk* atmosphere (an indigo sky with an amber glow on the horizon where the sun has just set, three ranges of parallax hills and trees, the lit cottage waiting on the far hill from the very first screen, drifting leaves, soft turf) rendered smooth at the screen's own resolution, up to 2× (HiDPI/`devicePixelRatio`-aware, so it's sharp, not pixelated). Clawd himself stays crisp pixel art as a deliberate contrast, drawn at a whole number of screen pixels per sprite pixel so his pixels stay even as he moves.
 
 ## Controls
 
@@ -56,6 +56,6 @@ The gaps in the ground are **ditches, not pits**: the first two bottom out in ea
 
 ## Status
 
-**Version 0.1**, shown in the bottom-right corner of the game.
+**Version 0.2**, shown in the bottom-right corner of the game.
 
-The walk home is complete: title, wisps, an optional ravine, deepening dusk, bench vista, ending, and fully synthesized audio (wind, footsteps, pentatonic chimes, an ending swell) — still one file, zero assets. Feel-tuning continues; whatever comes after the walk comes later.
+The walk home is complete: title, wisps, an optional ravine, deepening dusk, bench vista, an ending where Clawd steps inside and the walk can start over, and fully synthesized audio (wind, footsteps, pentatonic chimes, an ending swell) — still one file, zero assets. Feel-tuning continues; whatever comes after the walk comes later.

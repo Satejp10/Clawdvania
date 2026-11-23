@@ -1,16 +1,19 @@
 # v0.2 poster pass: build plan
 
-**Status (2026-11-23): planned, prototyped and checked. Not built.** `index.html` is
-untouched. A scratch copy of it was changed, driven through the walk headlessly and checked.
-`poster-pass/index.patch` turns today's `index.html` into that copy byte for byte (checked
-with `git apply` on a clean copy). Building this means applying the patch, running the
-two checks, updating the docs and opening a PR. There is no new logic to write. If you find
-yourself writing some, stop: something has drifted.
+**Status (2026-11-23): built as v0.2.** The owner said "build v0.2" the same day, which
+covers the plan as written, new ending included. It was built from this plan with no new
+logic: the patch applied cleanly and gave `69fd3234…`, both checks gave the expected
+results, the README images were retaken from Step 3's output, and the docs changed in the
+same PR. The rest of this file is the plan as it was written, kept for the record.
 
-**Waiting on the owner's yes.** It assumes the answer to question 3 of report
-SR-clawdvania-005 is "the poster pass goes first, before the rest of the stable list". It
-also changes how the ending behaves (Clawd stays at the door and goes inside), which is the
-owner's call.
+The plan was made against v0.1. `poster-pass/index.patch` turns v0.1's `index.html` into a
+checked scratch copy byte for byte (checked with `git apply` on a clean copy), so building it
+meant applying the patch, running the two checks, updating the docs and opening a PR, with no
+new logic to write.
+
+It assumed the answer to question 3 of report SR-clawdvania-005 is "the poster pass goes
+first, before the rest of the stable list", and it changes how the ending behaves (Clawd stays
+at the door and goes inside), which was the owner's call.
 
 Before and after, side by side: `poster-pass/before-after.jpg` (title, mid-walk, the bench as
 night falls, and 13 s after reaching the door).
