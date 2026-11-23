@@ -328,3 +328,18 @@ Entry format:
 - broke/fixed: nothing broken.
 - open: whether the author accepts the four-item "stable" list; whether "no fail state, no timer or score, no backtracking" is confirmed; whether the poster pass goes in before "stable".
 - next: the author answers the three questions in report 005. If the poster pass is approved, build it as one change, checked with `--baseline` against `ae83d91`. If not, the air poses wait on the stable list.
+
+## 2026-11-23 | session 10 | web
+- did: the author played v0.1 through to the ending ("so far so good", 10 wisps) and asked for the next step, and for a plan if there wasn't one. The next step was report 005's Canvas 2D poster pass, which had an outline but no build plan. Wrote one: `.claude/context/plans/poster-pass.md`, with the exact change as `poster-pass/index.patch`, a browser check `poster-pass/check.js` and `poster-pass/before-after.jpg`. `index.html` is untouched.
+- did: prototyped the pass in a scratch copy of `index.html` and checked it. `node tools/verify.js <prototype> --baseline <v0.1>`: PASS (6 checks) in 41.9 s; lockstep compared 674,462 ticks with 0 differences. `check.js`: 9 of 9 on the prototype. On v0.1 it fails 4: Clawd slides 146 px past the door, a jump rises 7.3 px, there is no walk-again, and his eye pixels come out 2 or 3 px wide (audit finding 4, now measured). The patch applies to v0.1 (SHA-1 `b7414f33…`) and gives the prototype byte for byte (`69fd3234…`).
+- did: measured cost in headless Chromium, which renders in software, so only the ratio means anything: about 15% more per frame (walk at 1280x720: 51.9 ms against 59.2 ms). It was about 30% until the haze was baked into the farthest hill layer instead of being its own full-screen pass.
+- decided: proposed, needs the author's yes: the poster pass goes before the rest of the "stable" list (question 3 of report 005), and as v0.2.
+- decided: proposed, needs the author's yes: the ending ignores input once Clawd reaches the door. He steps inside about 4 s in, a closing card follows, and after 11 s any key or tap starts the walk again. A closing sequence needs him to stay put, and it fixes walking on past the house (AUDIT smaller notes).
+- decided: the far-hill cottage stands on the layer's crest at x 471, small and hazy, and fades out while the camera moves from x 860 to 1060, before the real cottage appears at 1094, because two cottages on screen at once would be confusing.
+- rejected: the far cottage at its old size (30 px), because it read as a house in the playfield next to the floating ledges.
+- rejected: drawing the far cottage's windows after the night tint like the other lights, because they would show on top of platforms that pass in front of it (worked out from the geometry, not seen).
+- rejected: keeping the god rays and the top-right sun, because the posters light the scene from the horizon.
+- correction: while prototyping, a curve in the ravine's gorge was blamed on the new farthest hill range, which was lowered for it. The curve is the far hill's crest seen through the slot, and it was there in v0.1 too. The lower range stayed because it still looks right.
+- broke/fixed: nothing broken in the game.
+- open: the author's yes on the poster pass and on the new ending; the closing card's wording (it has no credit line); questions 1 and 2 of report 005 are still unanswered.
+- next: if the author says yes, build it from the plan (apply, both checks, docs, v0.2, draft PR), then the author plays it once, on a phone too.

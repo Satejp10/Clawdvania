@@ -1,0 +1,452 @@
+diff --git a/index.html b/index.html
+index 84d0f19..47c7d08 100644
+--- a/index.html
++++ b/index.html
+@@ -461,9 +461,11 @@ function frameAt(name, time) {
+ // Game state — title / play / ending. The walk ends at the cottage door.
+ // ============================================================================
+ const game = { state: "title", t: 0, endT: 0, ended: false, tfade: 0 };
++const WALK_AGAIN_T = 11;   // s into the ending before a key or tap starts the walk over
+ function startGame() {
+   initAudio();
+   if (game.state === "title") { game.state = "play"; playT = 0; }
++  else if (game.state === "ending" && game.endT > WALK_AGAIN_T) resetRun();
+ }
+ 
+ // ============================================================================
+@@ -773,10 +775,13 @@ function updatePlayer(dt) {
+   player.coyote = player.grounded ? T.coyoteMs / 1000 : Math.max(0, player.coyote - dt);
+   player.buffer = Math.max(0, player.buffer - dt);
+   player.wallLock = Math.max(0, player.wallLock - dt);
+-  if (input.jumpPressed) { player.buffer = T.jumpBufferMs / 1000; input.jumpPressed = false; }
++  // Home: once the ending starts, input is ignored and Clawd stays at the door.
++  // (tools/verify.js resets the ending after every tick, so its checks never see this.)
++  const home = game.state === "ending";
++  if (input.jumpPressed) { if (!home) player.buffer = T.jumpBufferMs / 1000; input.jumpPressed = false; }
+ 
+   // --- horizontal (input is ignored briefly after a wall kick-off) ---
+-  const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
++  const dir = home ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0);
+   const accel = (T.runMax / T.groundAccelTime) * (player.grounded ? 1 : T.airControl);
+   if (dir !== 0 && player.wallLock <= 0) {
+     player.vx = clamp(player.vx + dir * accel * dt, -T.runMax, T.runMax);
+@@ -957,14 +962,20 @@ function updateCamera() {
+ // Visual only; TUNING stays feel-only.
+ // ============================================================================
+ const THEME = {
+-  // Autumn Dusk — the ArtStation storybook reference, temperature pulled down
+-  sky: [[0, "#31406b"], [0.5, "#5d5a7e"], [0.82, "#a5776c"], [1, "#c99a6d"]],
+-  sunPos: [500, 90], sunR: 240, sunColor: "255,214,160", sunA: 0.34,
++  // Autumn Dusk — the ArtStation storybook reference, graded toward the posters in v0.2:
++  // deep indigo overhead and a warm band low down where the sun has just set behind the
++  // hills, with the glow sitting in the valley rather than up in a corner.
++  sky: [[0, "#1d2252"], [0.30, "#33305f"], [0.46, "#55406c"], [0.56, "#80506d"],
++        [0.63, "#b56664"], [0.69, "#df8a58"], [0.74, "#f0a45e"], [1, "#f3b46a"]],
++  sunPos: [260, 212], sunR: 230, sunColor: "255,176,96", sunA: 0.38,
++  // the farthest range: pale and warm, half lost in the glow
++  back: { top: "#76526c", bot: "#5c4565", baseY: 198, amp: 12, seed: 303, treeN: 0 },
++  // cottageX 471 is a crest of this range that is on screen from the first frame
+   far: { top: "#5b4a63", bot: "#463a52", baseY: 200, amp: 26, seed: 101, treeN: 8,
+-         tree: { trunk: "#3a2f42", leafHi: "#b0684a", leafLo: "#6e4340" }, cottageX: 940 },
++         tree: { trunk: "#3a2f42", leafHi: "#b0684a", leafLo: "#6e4340" }, cottageX: 471 },
+   mid: { top: "#413650", bot: "#2e2740", baseY: 268, amp: 22, seed: 202, treeN: 6,
+          tree: { trunk: "#241d30", leafHi: "#a85638", leafLo: "#59352f" } },
+-  cottageBody: "#3a3048", cottageRoof: "#2c2438",
++  cottageBody: "#4b3d5a", cottageRoof: "#3b3049",   // the far cottage, seen through haze
+   windowLit: "#ffd98a", windowGlow: "rgba(255,200,120,0.5)",
+   earthTop: "#463a52", earthBot: "#2b2338", earthSpeck: "#59462e",
+   grass: "#c08a4a", grassGlow: "#eec584", accent: "#c9563f",
+@@ -1000,23 +1011,19 @@ const skyCv = makeCanvas(VIEW_W, VIEW_H);
+   const gr = c.createLinearGradient(0, 0, 0, VIEW_H);
+   for (const [p, col] of THEME.sky) gr.addColorStop(p, col);
+   c.fillStyle = gr; c.fillRect(0, 0, VIEW_W, VIEW_H);
++  // the sun has just set: a wide, flat glow sitting on the horizon
+   const [sx, sy] = THEME.sunPos;
+-  const sun = c.createRadialGradient(sx, sy, 10, sx, sy, THEME.sunR);
++  c.save();
++  c.translate(sx, sy);
++  c.scale(1, 0.45);
++  const sun = c.createRadialGradient(0, 0, 10, 0, 0, THEME.sunR);
+   sun.addColorStop(0, "rgba(" + THEME.sunColor + "," + THEME.sunA + ")");
+   sun.addColorStop(1, "rgba(" + THEME.sunColor + ",0)");
+-  c.fillStyle = sun; c.fillRect(0, 0, VIEW_W, VIEW_H);
+-  c.fillStyle = "rgba(" + THEME.sunColor + ",0.06)";
+-  for (const [dx, w] of [[-40, 34], [60, 55], [180, 40]]) {
+-    c.beginPath();
+-    c.moveTo(sx + dx, -10);
+-    c.lineTo(sx + dx + w, -10);
+-    c.lineTo(sx + dx + w + 200, VIEW_H + 10);
+-    c.lineTo(sx + dx + 200 - w, VIEW_H + 10);
+-    c.closePath(); c.fill();
+-  }
++  c.fillStyle = sun; c.fillRect(-THEME.sunR, -THEME.sunR, THEME.sunR * 2, THEME.sunR * 2);
++  c.restore();
+ }
+ 
+-// --- parallax hill layers: gradient fills, shaded blob trees, one cottage ---
++// --- parallax hill layers: gradient fills, shaded blob trees (the far cottage is drawn live) ---
+ const LAYER_W = VIEW_W * 2;
+ 
+ function drawTree(c, x, groundY, size, tones, rnd) {
+@@ -1035,7 +1042,7 @@ function drawTree(c, x, groundY, size, tones, rnd) {
+ }
+ 
+ function drawCottage(c, x, y) {
+-  const s = 30;
++  const s = 20;
+   c.fillStyle = THEME.cottageBody;
+   c.fillRect(x - s / 2, y - s * 0.8, s, s * 0.8);
+   c.fillStyle = THEME.cottageRoof;
+@@ -1045,11 +1052,36 @@ function drawCottage(c, x, y) {
+   c.lineTo(x + s * 0.65, y - s * 0.75);
+   c.closePath(); c.fill();
+   c.fillRect(x + s * 0.18, y - s * 1.28, s * 0.14, s * 0.4);       // chimney
+-  const g = c.createRadialGradient(x, y - s * 0.4, 1, x, y - s * 0.4, s * 0.5);
++}
++// Its two lit windows and their halo, drawn separately so they can fade with it.
++function drawCottageLight(c, x, y, a) {
++  const s = 20;
++  c.globalAlpha = a;
++  const g = c.createRadialGradient(x, y - s * 0.45, 1, x, y - s * 0.45, s * 0.6);
+   g.addColorStop(0, THEME.windowGlow); g.addColorStop(1, "rgba(255,200,120,0)");
+   c.fillStyle = g; c.fillRect(x - s, y - s, s * 2, s * 1.2);       // glow halo
+   c.fillStyle = THEME.windowLit;
+-  c.fillRect(x - 3, y - s * 0.5, 7, 8);                            // lit window
++  c.fillRect(x - 7, y - s * 0.5, 4, 4);                            // lit windows
++  c.fillRect(x + 3, y - s * 0.5, 4, 4);
++  c.globalAlpha = 1;
++}
++// Chimney smoke: a few soft puffs rising and leaning on the breeze. x, y is the chimney
++// top in screen space; s scales it (the far cottage is smaller); a is overall opacity.
++function drawSmoke(c, x, y, t, s, a) {
++  for (let i = 0; i < 8; i++) {
++    const p = (t * 0.18 + i / 8) % 1;                              // 0 at the chimney, 1 gone
++    const px = x + (p * 16 + Math.sin(p * 5 + i * 1.7) * 2.2) * s;
++    const py = y - p * 34 * s;
++    const pa = a * 0.2 * Math.min(1, p * 5) * (1 - p);
++    c.fillStyle = "rgba(196,182,204," + pa.toFixed(3) + ")";
++    c.beginPath(); c.arc(px, py, (2 + p * 6.5) * s, 0, 6.29); c.fill();
++  }
++}
++// The far cottage hands over to the real one. Fully there until the camera passes 860,
++// gone by 1060, before the real cottage's roof enters the frame (at cam.x 1094).
++function farHomeAlpha(cx) {
++  const t = clamp((cx - 860) / 200, 0, 1);
++  return 1 - t * t * (3 - 2 * t);
+ }
+ 
+ function makeHillLayer(L) {
+@@ -1073,14 +1105,27 @@ function makeHillLayer(L) {
+     const tx = rnd() * LAYER_W, ty = yAt(tx) + 6, s = 10 + rnd() * 14;
+     for (const ox of [-LAYER_W, 0, LAYER_W]) drawTree(c, tx + ox, ty, s, L.tree, mulberry32(L.seed + i * 7));
+   }
+-  if (L.cottageX != null) {
+-    for (const ox of [-LAYER_W, 0, LAYER_W]) drawCottage(c, L.cottageX + ox, yAt(L.cottageX) + 4);
+-  }
++  // The cottage isn't baked in: render() draws it live, so it can fade out before the
++  // real one comes into view. Only where it stands is worked out here.
++  if (L.cottageX != null) L.cottageY = yAt(L.cottageX) + 4;
+   return cv;
+ }
++const layerBack = makeHillLayer(THEME.back);
+ const layerFar = makeHillLayer(THEME.far);
+ const layerMid = makeHillLayer(THEME.mid);
+ 
++// Warm haze over the farthest range, so it fades into the glow. Baked into that layer:
++// the haze doesn't change sideways, so it can scroll with the layer for free instead of
++// costing a full-screen pass of its own.
++{
++  const c = layerBack.getContext("2d");
++  const g = c.createLinearGradient(0, 150, 0, VIEW_H);
++  g.addColorStop(0, "rgba(232,140,96,0)");
++  g.addColorStop(0.35, "rgba(232,140,96,0.30)");
++  g.addColorStop(1, "rgba(150,90,120,0.18)");
++  c.fillStyle = g; c.fillRect(0, 150, LAYER_W, VIEW_H - 150);
++}
++
+ // --- drifting mist band (tileable, baked once, drawn with its own parallax) ---
+ const mistCv = makeCanvas(LAYER_W, VIEW_H);
+ {
+@@ -1100,6 +1145,7 @@ const mistCv = makeCanvas(LAYER_W, VIEW_H);
+ const HOME = {
+   x: 1616, w: 64, groundY: 384, doorX: 1648, eaveY: 338,
+   win: { x: 1622, y: 350, w: 12, h: 12 },
++  chimX: 1665, chimY: 308,                 // top of the chimney, where the smoke starts
+ };
+ const BENCH = { x0: 1372, x1: 1398, feetY: 272, cx: 1385 }; // stump on the vista perch
+ 
+@@ -1436,7 +1482,9 @@ function onResize() {
+   // Back the display canvas with PHYSICAL pixels so the browser never has to
+   // bilinear-stretch the final frame (that fractional stretch is what blurred
+   // everything on HiDPI displays, e.g. devicePixelRatio 1.5).
+-  dpr = window.devicePixelRatio || 1;
++  // Capped at 2 (audit finding 5). The art is 512x288 scaled up, so past 2x there is no
++  // detail to gain, only more fill per full-screen pass on 4K screens.
++  dpr = Math.min(window.devicePixelRatio || 1, 2);
+   const pw = Math.round(innerWidth * dpr);
+   const ph = Math.round(innerHeight * dpr);
+   screen.width = pw;
+@@ -1490,13 +1538,52 @@ function render(fps, dt) {
+     sctx.drawImage(starCv, 0, 0, VIEW_W, VIEW_H);
+     sctx.globalAlpha = 1;
+   }
++  drawParallax(layerBack, 0.12, cx);
+   drawParallax(layerFar, 0.25, cx);
++  // home on the far hill: on screen from the first frame, gone before the real one shows
++  const farHome = farHomeAlpha(cx);
++  if (farHome > 0) {
++    const hx = THEME.far.cottageX - cx * 0.25, hy = THEME.far.cottageY;
++    sctx.globalAlpha = farHome;
++    drawCottage(sctx, hx, hy);
++    sctx.globalAlpha = 1;
++    drawCottageLight(sctx, hx, hy, farHome);
++    drawSmoke(sctx, hx + 5, hy - 26, game.t, 0.45, farHome);
++  }
+   drawParallax(mistCv, 0.35, cx);
+   drawParallax(layerMid, 0.5, cx);
+ 
+   // tiles (visible slice of the baked room; baked at TILE_SS for foreground crispness)
+   sctx.drawImage(tileCv, cx * TILE_SS, cy * TILE_SS, VIEW_W * TILE_SS, VIEW_H * TILE_SS, 0, 0, VIEW_W, VIEW_H);
+ 
++  // chimney smoke from the real cottage
++  if (HOME.chimX - cx > -40 && HOME.chimX - cx < VIEW_W + 10) drawSmoke(sctx, HOME.chimX - cx, HOME.chimY - cy, game.t, 1, 1);
++
++  // falling leaves — filled shapes, anti-aliased edges (smooth). Drawn before the night
++  // tint because they are part of the world, not a light.
++  updateLeaves(dt);
++  for (const m of leaves) {
++    const x = m.x - cx, y = m.y - cy;
++    if (x < -6 || x > VIEW_W + 6 || y < -6 || y > VIEW_H + 6) continue;
++    sctx.save();
++    sctx.translate(x, y);
++    sctx.rotate(m.rot);
++    sctx.globalAlpha = m.a;
++    sctx.fillStyle = m.col;
++    sctx.beginPath();
++    sctx.ellipse(0, 0, 2.4, 1.2, 0, 0, 6.29);
++    sctx.fill();
++    sctx.restore();
++  }
++  sctx.globalAlpha = 1;
++
++  // dusk deepening: the world settles into night as you near home. Everything that gives
++  // off light is drawn after this, so the night dims the world but never the lights.
++  if (duskD > 0.02) {
++    sctx.fillStyle = "rgba(16,13,42," + (0.34 * duskD).toFixed(3) + ")";
++    sctx.fillRect(0, 0, VIEW_W, VIEW_H);
++  }
++
+   // the cottage window lights up when you make it home
+   if (game.ended) {
+     const lit = Math.min(1, game.endT / 1.3);
+@@ -1516,6 +1603,19 @@ function render(fps, dt) {
+       sctx.fillRect(wx - 44, wy - 44, 100, 100);
+       sctx.restore();
+     }
++    // the door opens on a warm room as Clawd steps inside, then closes behind him
++    const door = Math.sin(Math.PI * clamp((game.endT - 3.3) / 1.6, 0, 1));
++    if (door > 0.01) {
++      const dx = HOME.doorX - cx, dy = HOME.groundY - 12 - cy;
++      sctx.save();
++      sctx.globalCompositeOperation = "lighter";
++      const dg = sctx.createRadialGradient(dx, dy, 1, dx, dy, 30);
++      dg.addColorStop(0, "rgba(255,190,110," + (0.55 * door).toFixed(3) + ")");
++      dg.addColorStop(1, "rgba(255,190,110,0)");
++      sctx.fillStyle = dg;
++      sctx.fillRect(dx - 30, dy - 30, 60, 60);
++      sctx.restore();
++    }
+   }
+ 
+   // Clawd — sprite is 16x12 around a 14x10 hitbox. Kept crisp (nearest-neighbor)
+@@ -1541,18 +1641,28 @@ function render(fps, dt) {
+   const footX = Math.round(player.x - cx) + player.w / 2;
+   const footY = Math.round(player.y - cy) + player.h;
+ 
+-  // lantern glow: Clawd carries the light as the dusk deepens
+-  const glowA = duskD * (0.10 + 0.045 * Math.min(10, wispCount));
++  // at the end Clawd steps inside: he fades as the door glows
++  const clawdA = game.ended ? 1 - clamp((game.endT - 3.6) / 0.6, 0, 1) : 1;
++
++  // lantern glow: Clawd carries the light as the dusk deepens. Capped and warm, so a full
++  // lantern lights him up instead of washing him out in a pale haze.
++  const lamp = Math.min(10, wispCount);
++  const glowA = duskD * (0.07 + 0.018 * lamp) * clawdA;
+   if (glowA > 0.015) {
+     sctx.save();
+     sctx.globalCompositeOperation = "lighter";
+-    const gr = sctx.createRadialGradient(footX, footY - 6, 2, footX, footY - 6, 26 + wispCount * 2);
+-    gr.addColorStop(0, "rgba(255,214,150," + glowA.toFixed(3) + ")");
+-    gr.addColorStop(1, "rgba(255,214,150,0)");
++    const gr = sctx.createRadialGradient(footX, footY - 6, 2, footX, footY - 6, 24 + lamp * 1.6);
++    gr.addColorStop(0, "rgba(255,186,104," + glowA.toFixed(3) + ")");
++    gr.addColorStop(1, "rgba(255,186,104,0)");
+     sctx.fillStyle = gr;
+     sctx.fillRect(footX - 60, footY - 66, 120, 120);
+     sctx.restore();
+   }
++  // a soft contact shadow keeps him planted
++  if (player.grounded && clawdA > 0) {
++    sctx.fillStyle = "rgba(12,8,22," + (0.38 * clawdA).toFixed(3) + ")";
++    sctx.beginPath(); sctx.ellipse(footX, footY, 8, 1.6, 0, 0, 6.29); sctx.fill();
++  }
+ 
+   // squash & stretch (render-only): impact dip on landing, lengthen at speed in air
+   if (fx.landImpact > 0) {
+@@ -1616,13 +1726,18 @@ function render(fps, dt) {
+     sclY = 1 + st;
+     sclX = 1 - st * 0.7;
+   }
+-  sctx.imageSmoothingEnabled = false;
+-  sctx.save();
+-  sctx.translate(footX, footY);
+-  sctx.scale(sclX, sclY);
+-  sctx.drawImage(img, -SPR_W / 2, -SPR_H);
+-  sctx.restore();
+-  sctx.imageSmoothingEnabled = true;
++  // Drawn in device pixels at a whole-number scale (audit finding 4). At a fractional
++  // scale the same sprite pixel comes out 2 px wide in one spot and 3 px in the next, so
++  // his eyes changed width as he walked. Feet stay anchored on the hitbox.
++  if (clawdA > 0) {
++    const k = Math.max(1, Math.round(S));
++    sctx.save();
++    sctx.imageSmoothingEnabled = false;
++    sctx.globalAlpha = clawdA;
++    sctx.setTransform(k * sclX, 0, 0, k * sclY, Math.round(offX + footX * S), Math.round(offY + footY * S));
++    sctx.drawImage(img, -SPR_W / 2, -SPR_H);
++    sctx.restore();
++  }
+ 
+   // wisps (drawn over Clawd so orbiters pass in front)
+   updateWisps(dt);
+@@ -1632,13 +1747,14 @@ function render(fps, dt) {
+     const pulse = 0.6 + 0.4 * Math.sin(w.t * 3);
+     sctx.save();
+     sctx.globalCompositeOperation = "lighter";
+-    const g = sctx.createRadialGradient(x, y, 0.5, x, y, 7);
+-    g.addColorStop(0, "rgba(255,230,170," + (0.8 * pulse).toFixed(3) + ")");
+-    g.addColorStop(1, "rgba(255,200,120,0)");
++    const g = sctx.createRadialGradient(x, y, 0.5, x, y, 10);
++    g.addColorStop(0, "rgba(255,214,140," + (0.75 * pulse).toFixed(3) + ")");
++    g.addColorStop(0.35, "rgba(255,170,80," + (0.28 * pulse).toFixed(3) + ")");
++    g.addColorStop(1, "rgba(255,150,60,0)");
+     sctx.fillStyle = g;
+-    sctx.fillRect(x - 8, y - 8, 16, 16);
+-    sctx.fillStyle = "rgba(255,245,220," + pulse.toFixed(3) + ")";
+-    sctx.beginPath(); sctx.arc(x, y, 1.3, 0, 6.29); sctx.fill();
++    sctx.fillRect(x - 10, y - 10, 20, 20);
++    sctx.fillStyle = "rgba(255,246,226," + pulse.toFixed(3) + ")";
++    sctx.beginPath(); sctx.arc(x, y, 1.4, 0, 6.29); sctx.fill();
+     sctx.restore();
+   }
+ 
+@@ -1653,29 +1769,6 @@ function render(fps, dt) {
+   }
+   sctx.globalAlpha = 1;
+ 
+-  // falling leaves — filled shapes, anti-aliased edges (smooth)
+-  updateLeaves(dt);
+-  for (const m of leaves) {
+-    const x = m.x - cx, y = m.y - cy;
+-    if (x < -6 || x > VIEW_W + 6 || y < -6 || y > VIEW_H + 6) continue;
+-    sctx.save();
+-    sctx.translate(x, y);
+-    sctx.rotate(m.rot);
+-    sctx.globalAlpha = m.a;
+-    sctx.fillStyle = m.col;
+-    sctx.beginPath();
+-    sctx.ellipse(0, 0, 2.4, 1.2, 0, 0, 6.29);
+-    sctx.fill();
+-    sctx.restore();
+-  }
+-  sctx.globalAlpha = 1;
+-
+-  // dusk deepening: the world settles into night as you near home
+-  if (duskD > 0.02) {
+-    sctx.fillStyle = "rgba(16,13,42," + (0.34 * duskD).toFixed(3) + ")";
+-    sctx.fillRect(0, 0, VIEW_W, VIEW_H);
+-  }
+-
+   // foreground silhouettes (branches above, grass below) — closest parallax layer
+   drawParallax(layerFg, 1.5, cx);
+ 
+@@ -1705,6 +1798,15 @@ function render(fps, dt) {
+     for (let i = 0; i < L.length; i++) sctx.fillText(L[i], PX(6), PY(6 + i * 10));
+   }
+ 
++  // Letter-spaced capitals like the posters, centred on x. Spaced by hand, because
++  // canvas letterSpacing isn't in every browser yet.
++  const spaced = (text, x, y, gap) => {
++    const ws = [...text].map((ch) => sctx.measureText(ch).width);
++    let px = x - (ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1)) / 2;
++    sctx.textAlign = "left";
++    [...text].forEach((ch, i) => { sctx.fillText(ch, px, y); px += ws[i] + gap; });
++  };
++
+   // hint — native-res sans-serif, fades out after the first few seconds of play
+   // (skipped on touch devices — they have on-screen buttons instead)
+   const hintA = (isTouch || game.state === "title") ? 0 : Math.max(0, Math.min(0.55, (6 - playT) * 0.6));
+@@ -1736,19 +1838,24 @@ function render(fps, dt) {
+   // title card — fades away on the first input
+   const titleA = 1 - game.tfade;
+   if (titleA > 0.002) {
+-    sctx.fillStyle = "rgba(10,8,22," + (0.32 * titleA).toFixed(3) + ")";
+-    sctx.fillRect(offX, offY, VIEW_W * S, VIEW_H * S);
+-    sctx.textAlign = "center";
++    // on the open sky above the ledges, the way the posters set it; the prompt sits on
++    // the dark earth at the bottom
++    const tg = sctx.createLinearGradient(0, offY, 0, offY + PS(150));
++    tg.addColorStop(0, "rgba(10,8,22," + (0.35 * titleA).toFixed(3) + ")");
++    tg.addColorStop(1, "rgba(10,8,22,0)");
++    sctx.fillStyle = tg;
++    sctx.fillRect(offX, offY, VIEW_W * S, PS(150));
+     sctx.fillStyle = "rgba(255,233,196," + (0.95 * titleA).toFixed(3) + ")";
+-    sctx.font = "700 " + PS(27) + "px Georgia, 'Times New Roman', serif";
+-    sctx.fillText("Clawdvania", PX(VIEW_W / 2), PY(96));
+-    sctx.fillStyle = "rgba(235,240,245," + (0.65 * titleA).toFixed(3) + ")";
+-    sctx.font = "italic " + PS(10) + "px Georgia, serif";
+-    sctx.fillText("a walk home at dusk", PX(VIEW_W / 2), PY(132));
++    sctx.font = PS(26) + "px Georgia, 'Times New Roman', serif";
++    spaced("CLAWDVANIA", PX(VIEW_W / 2), PY(34), PS(3.2));
++    sctx.fillStyle = "rgba(255,233,196," + (0.72 * titleA).toFixed(3) + ")";
++    sctx.font = "600 " + PS(7) + "px system-ui, sans-serif";
++    spaced("A WALK HOME AT DUSK", PX(VIEW_W / 2), PY(70), PS(2.6));
+     const pulse = 0.45 + 0.3 * Math.sin(game.t * 2.2);
+     sctx.fillStyle = "rgba(235,240,245," + (pulse * titleA).toFixed(3) + ")";
+-    sctx.font = "600 " + PS(8.5) + "px system-ui, sans-serif";
+-    sctx.fillText(isTouch ? "tap to begin" : "press any key to begin", PX(VIEW_W / 2), PY(170));
++    sctx.font = "600 " + PS(8) + "px system-ui, sans-serif";
++    sctx.textAlign = "center";
++    sctx.fillText(isTouch ? "tap to begin" : "press any key to begin", PX(VIEW_W / 2), PY(262));
+     sctx.textAlign = "left";
+   }
+ 
+@@ -1770,6 +1877,28 @@ function render(fps, dt) {
+       sctx.textAlign = "left";
+     }
+   }
++
++  // closing — once the welcome has faded, night settles over the cottage and a last card
++  // offers the walk again (startGame handles the key or tap)
++  if (game.ended && game.endT > 10) {
++    const k = Math.min(1, (game.endT - 10) / 2);
++    sctx.fillStyle = "rgba(10,8,22," + (0.45 * k).toFixed(3) + ")";
++    sctx.fillRect(offX, offY, VIEW_W * S, VIEW_H * S);
++    sctx.fillStyle = "rgba(255,233,196," + (0.9 * k).toFixed(3) + ")";
++    sctx.font = PS(18) + "px Georgia, 'Times New Roman', serif";
++    spaced("CLAWDVANIA", PX(VIEW_W / 2), PY(96), PS(2.4));
++    sctx.fillStyle = "rgba(235,240,245," + (0.65 * k).toFixed(3) + ")";
++    sctx.font = "italic " + PS(9) + "px Georgia, serif";
++    sctx.textAlign = "center";
++    sctx.fillText("thanks for walking home", PX(VIEW_W / 2), PY(124));
++    if (game.endT > WALK_AGAIN_T) {
++      const pulse = 0.45 + 0.3 * Math.sin(game.t * 2.2);
++      sctx.fillStyle = "rgba(235,240,245," + (pulse * k).toFixed(3) + ")";
++      sctx.font = "600 " + PS(8) + "px system-ui, sans-serif";
++      sctx.fillText(isTouch ? "tap to walk again" : "press any key to walk again", PX(VIEW_W / 2), PY(262));
++    }
++    sctx.textAlign = "left";
++  }
+ }
+ 
+ // ============================================================================
