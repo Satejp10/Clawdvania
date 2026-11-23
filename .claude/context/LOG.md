@@ -352,3 +352,4 @@ Entry format:
 - correction: the plan said Clawd is drawn at a whole number of device pixels per sprite pixel, but not that this changes his size against the world. He's drawn at `k / S` of his old size: 1.2× in a 1280×720 window, 1.07× at 1920×1080. Noted in AUDIT and in the PR, for the playtest.
 - open: the author plays the PR's `index.html` once (the sky's warmth, the far cottage's fade, the ending's timing, Clawd's size, smoothness on their slowest device); the closing card's wording; questions 1 and 2 of report 005.
 - next: if the playtest is good, merge, and the live site shows v0.2. If not, tune from the author's notes in the same PR.
+- did: generated status report `.claude/context/reports/SR-clawdvania-007.md`, which supersedes SR-clawdvania-006. Checked for it: the live page's SHA-1 equals `main`'s `index.html` (`b7414f33…`, still v0.1); every line and file cited in its section 2.3 re-checked with grep.
