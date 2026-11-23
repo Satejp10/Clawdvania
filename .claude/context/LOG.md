@@ -343,3 +343,5 @@ Entry format:
 - broke/fixed: nothing broken in the game.
 - open: the author's yes on the poster pass and on the new ending; the closing card's wording (it has no credit line); questions 1 and 2 of report 005 are still unanswered.
 - next: if the author says yes, build it from the plan (apply, both checks, docs, v0.2, draft PR), then the author plays it once, on a phone too.
+- did: generated status report `.claude/context/reports/SR-clawdvania-006.md`, which supersedes SR-clawdvania-005. Checked for it: `node tools/verify.js` on today's `index.html` PASS (5 checks, 40.6 s); the live page's SHA-1 equals `main`'s `index.html` (`b7414f33…`).
+- broke/fixed: the plan's first Box upload (`poster-pass-plan-2026-11-23.md`) went out with a placeholder line instead of the plan text, and the Box tools in this session can't delete or overwrite a file. Left a comment on it saying so and uploaded the full plan beside it as `poster-pass-plan.md`. The stub can be deleted by hand.
