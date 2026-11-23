@@ -139,7 +139,14 @@ They're also redundant. `solidAt` already returns `true` for `px < 0 || px >= RO
 unchanged (verified: the player still snaps at `x = 0` and `x = ROOM_W - w`) and it
 reclaims a tile of walkable space at each end.
 
-### 4. Fractional render scale makes Clawd's pixels uneven · **low**
+### 4. Fractional render scale makes Clawd's pixels uneven · **low** · ✅ FIXED
+
+> **Resolved in v0.2.** Clawd is drawn at a whole-number scale, `k = Math.max(1, Math.round(S))`,
+> and placed on a whole device pixel; the world keeps the fractional scale. Measured at S = 2.5:
+> every eye pixel is now 3 device px wide, where it was 2 or 3. The trade-off is size: he's drawn
+> at `k / S` times his old size, which is 1.2× in a 1280×720 window and 1.07× at 1920×1080. Kept
+> below for the record.
+
 
 `S = Math.min(pw / VIEW_W, ph / VIEW_H)` (`index.html:1181`) is fractional at
 essentially every common resolution — 2.5 at 1280×720, 3.75 at 1920×1080 — and the
@@ -155,7 +162,12 @@ factor) and position it on a whole device pixel, while leaving the painterly wor
 the fractional scale. The deliberate crisp-mascot-against-smooth-world contrast is the
 right call; it just needs an integer scale to actually land.
 
-### 5. `devicePixelRatio` is uncapped · **low**
+### 5. `devicePixelRatio` is uncapped · **low** · ✅ FIXED
+
+> **Resolved in v0.2** with the one-liner suggested below:
+> `dpr = Math.min(window.devicePixelRatio || 1, 2)`. A 3× phone now draws less than half the
+> pixels it did. Kept below for the record.
+
 
 `screen.width = Math.round(innerWidth * dpr)` (`index.html:1173-1174`) has no ceiling,
 and `render()` performs roughly a dozen full-viewport composite passes per frame (sky,
@@ -185,7 +197,8 @@ softens it slightly.
 - **`const screen` shadows `window.screen`** (`index.html:1165`). There's already a
   comment and a `window.screen` workaround at the orientation lock — rename it (`cvs`)
   rather than keep working around it.
-- **After the ending you can walk right past the cottage** to the boundary wall.
+- ~~**After the ending you can walk right past the cottage** to the boundary wall.~~ ✅ **Fixed**
+  in v0.2: input is ignored once the ending starts, so Clawd stays at the door and goes inside.
 - **No `prefers-reduced-motion` handling.** The whole game is motion, so a full
   accommodation isn't realistic, but the title card's `tilt` keyframe animation and the
   drifting leaves are cheap to gate.
@@ -201,12 +214,13 @@ softens it slightly.
 2. ~~Finding 1 (the pits) — biggest impact on first-play impression; needs an art call.~~ ✅ done
 3. ~~Finding 3 (boundary columns) — one-line edit to the level strings.~~ ✅ done (it was not
    a one-line edit — see the correction above)
-4. Findings 4 and 5 — polish, best done together in the resize/draw path. **Still open.**
+4. ~~Findings 4 and 5 — polish, best done together in the resize/draw path.~~ ✅ done in v0.2,
+   as part of the poster pass (`.claude/context/plans/poster-pass.md`)
 
 ## Still open
 
-- **Finding 4** — fractional render scale makes Clawd's pixels uneven.
-- **Finding 5** — `devicePixelRatio` is uncapped.
+- ~~**Finding 4** — fractional render scale makes Clawd's pixels uneven.~~ ✅ fixed in v0.2
+- ~~**Finding 5** — `devicePixelRatio` is uncapped.~~ ✅ fixed in v0.2
 - The smaller notes above that aren't struck through.
 - ~~**The abilities have nowhere to matter — now doubly so.**~~ ✅ **Resolved by the ravine**
   (2026-11-16), after a first attempt that didn't do what it claimed.
