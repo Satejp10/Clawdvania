@@ -339,9 +339,9 @@ const BODY = {
   // apex, `fall` coming down. `jump` runs on its own clock, started by the jump itself.
   jump: [
     { eyeY: 5, hold: 0.06, rows: [   // launch: gathered low, legs bent out. The anticipation:
-      "................",            // it shows for the first 3 ticks while the jump is already
-      "................",            // under way, so nothing waits for it.
-      "................",
+      "................",            // shown while the jump is already under way, so nothing
+      "................",            // waits for it. 0.06 s falls between the 3rd and 4th
+      "................",            // tick, so it lasts exactly 3 ticks.
       "..oooooooooooo..",
       "..oooooooooooo..",
       "..oooooooooooo..",

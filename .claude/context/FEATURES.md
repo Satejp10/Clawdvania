@@ -5,7 +5,7 @@ been ruled out. The details live in the linked plans, [`LOG.md`](LOG.md) and
 [`AUDIT.md`](../../AUDIT.md); this file is the index. When a feature changes state, or the
 owner suggests a new one, update this file in the same commit.
 
-Last updated 2026-11-24, with v0.2 live.
+Last updated 2026-11-24, for v0.3.
 
 ## Built
 
@@ -27,18 +27,18 @@ Last updated 2026-11-24, with v0.2 live.
 | **The poster look.** An indigo sky with an amber horizon, three ranges of hills, the cottage on the far hill from the first screen, lights that stay bright as night falls, gold wisps, a soft shadow under Clawd, and the title on open sky. Plan: [`plans/poster-pass.md`](plans/poster-pass.md). | v0.2 |
 | **An ending that closes.** Clawd stops at the door and steps inside, then a closing card appears. After 11 s any key or tap starts the walk again. | v0.2 |
 | **Even pixels.** Clawd is drawn on whole screen pixels, and sharpness is capped at 2× to save work on phones (audit findings 4 and 5). | v0.2 |
+| **Jump poses.** Clawd crouches for the first 3 ticks of a jump (the anticipation, shown while the jump is already under way, so it adds no delay), rises with his legs trailing and his eyes up, hangs at the top with his legs splayed (v0.2's one air pose), and falls with his arms flung up and his eyes on the ground. The pose follows his speed, so hops, wall kicks, the double jump and ledge drops all get it. Drawing only: the physics is unchanged. | v0.3 |
+| **A credit line on the closing card:** "by Satej Patil · made with Claude Code", the owner's wording. | v0.3 |
 
 ## Planned
 
 The owner accepted the four-item "stable" list on 2026-11-24: (1) the ravine, (2) per-frame
 durations, then an anticipation frame and 2–3 `air` poses, (3) audit findings 4 and 5, and
-(4) the smaller notes. Items 1 and 3 and the first half of item 2 are built. When everything
-below except the submission is built, the game is "stable".
+(4) the smaller notes. Items 1–3 are built; item 2's poses came in v0.3. Only the smaller
+notes are left, and once they're built the game is "stable".
 
 | Feature | When |
 |---|---|
-| **More jump poses.** An anticipation frame before a jump, and 2–3 `air` poses so Clawd looks different rising, at the top and falling. Today he has one. | Next, as v0.3. |
-| **A credit line on the closing card:** "by Satej Patil · made with Claude Code". The owner's wording, 2026-11-24. | With the poses, in v0.3. |
 | **The open smaller notes in `AUDIT.md`.** Count wisp pickups in the fixed 60 Hz step instead of the render pass, rename `const screen`, respect the reduced-motion setting, and add a LICENSE and a favicon. | After v0.3 merges. The last item on the "stable" list. |
 | **The claude-works submission.** | Paused until the game is "stable" (the owner's call, 2026-08-01). |
 
