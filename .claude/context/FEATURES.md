@@ -5,7 +5,7 @@ been ruled out. The details live in the linked plans, [`LOG.md`](LOG.md) and
 [`AUDIT.md`](../../AUDIT.md); this file is the index. When a feature changes state, or the
 owner suggests a new one, update this file in the same commit.
 
-Last updated 2026-11-23, with v0.2 live.
+Last updated 2026-11-24, with v0.2 live.
 
 ## Built
 
@@ -30,38 +30,42 @@ Last updated 2026-11-23, with v0.2 live.
 
 ## Planned
 
-These are on the four-item "stable" list, which is proposed and waits on the owner's yes
-(question 3 of report 007). Nothing here is built yet.
+The owner accepted the four-item "stable" list on 2026-11-24: (1) the ravine, (2) per-frame
+durations, then an anticipation frame and 2–3 `air` poses, (3) audit findings 4 and 5, and
+(4) the smaller notes. Items 1 and 3 and the first half of item 2 are built. When everything
+below except the submission is built, the game is "stable".
 
 | Feature | When |
 |---|---|
-| **More jump poses.** An anticipation frame before a jump, and 2–3 `air` poses so Clawd looks different rising, at the top and falling. Today he has one. | Next, once the list is accepted. |
-| **The open smaller notes in `AUDIT.md`.** Count wisp pickups in the fixed 60 Hz step instead of the render pass, rename `const screen`, respect the reduced-motion setting, and add a LICENSE and a favicon. | After the poses. |
+| **More jump poses.** An anticipation frame before a jump, and 2–3 `air` poses so Clawd looks different rising, at the top and falling. Today he has one. | Next, as v0.3. |
+| **A credit line on the closing card:** "by Satej Patil · made with Claude Code". The owner's wording, 2026-11-24. | With the poses, in v0.3. |
+| **The open smaller notes in `AUDIT.md`.** Count wisp pickups in the fixed 60 Hz step instead of the render pass, rename `const screen`, respect the reduced-motion setting, and add a LICENSE and a favicon. | After v0.3 merges. The last item on the "stable" list. |
 | **The claude-works submission.** | Paused until the game is "stable" (the owner's call, 2026-08-01). |
 
 ## Ideas
 
 Not agreed and not planned. Each one needs the owner's yes, then a plan.
 
-### Breakable floors and a downward slash
+### Breakable floors and a downward slam
 
-*The owner's idea, 2026-11-23.*
+*The owner's idea, 2026-11-23. On 2026-11-24 the owner kept it as an idea: a possible
+mechanic, not planned.*
 
 - Some floors crack and crumble when Clawd walks on them, but they never give way. That
   hints that something is underneath.
-- A new move, a downward slash like Hollow Knight's Desolate Dive: from the air, Clawd
-  drives straight down, and a cracked floor breaks under him to open a secret area.
+- A new move from the air: Clawd drives straight down, like Hollow Knight's Desolate Dive,
+  and a cracked floor breaks under him to open a secret area.
 
-To settle before planning (suggestions):
+Settled by the owner, 2026-11-24, for if it's ever planned:
 
-- **Slash or slam?** The game has no combat, so a dive or ground-pound may fit better than
-  an attack.
-- **How big are the secret areas?** Small pockets like the ravine's hollows fit the "one
-  ravine, not a second area" scope. Anything bigger reopens that decision.
+- **A slam, not a slash.** The game has no combat.
+- **Small pockets, not a second area,** like the ravine's hollows.
+- **Clawd has the move from the start,** like the double jump and the cling.
+
+Still to settle before planning (suggestions):
+
 - **Controls.** Down isn't used on the keyboard today, so Down in the air could trigger it.
   Phones only have left, right and jump, so they'd need a fourth button.
-- **There from the start, or found on the walk?** The double jump and the cling are there
-  from the start.
 - **Safety.** Every secret area needs a way out with plain jumps. Broken floors come back on
   R and on "walk again". `tools/verify.js` has to learn the new move and the new tiles.
 
@@ -70,7 +74,6 @@ To settle before planning (suggestions):
 - **Depth in the ravine.** The background moves up and down too, with roots and moss like
   the V2 poster. From the poster-pass plan.
 - **Out-of-focus leaves** in the bottom corners, like the posters. From the poster-pass plan.
-- **A credit line on the closing card.** Question 2 of report 007.
 - **Move Clawd's start on phones.** He seems to start under the right-arrow button. That was
   seen on an emulated phone, not a real one, so check it in the phone playtest.
 - **A third octave of wisp chimes.** Wisps 13–15 repeat the notes of 7–9. From the ravine
@@ -91,5 +94,6 @@ Don't bring these back unless the owner reopens them.
 - **Gating the walk home behind a move,** like the raised wall of Satejp10/Clawdvania#12
   (2026-11-16).
 - **A 3D rewrite** (2026-11-18). It would be a different game.
-- **A fail state, a timer or score, or backtracking.** Proposed for this list on 2026-08-01,
-  but the owner hasn't confirmed it yet (question 4 of report 007).
+- **A fail state, a timer or score, or backtracking.** Proposed on 2026-08-01, confirmed by
+  the owner on 2026-11-24. Backtracking means returning to earlier areas; a local trip like
+  the ravine is fine.

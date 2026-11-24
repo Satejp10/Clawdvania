@@ -360,3 +360,10 @@ Entry format:
 - open: the author's phone check on the live site (planned for tomorrow); questions 2–4 of report 007: a credit line on the closing card, the stable list, and "no fail state, no timer or score, no backtracking".
 - next: the phone check. Then, if the stable list is accepted, the jump poses.
 - did: generated status report `.claude/context/reports/SR-clawdvania-008.md`, which supersedes SR-clawdvania-007. Checked for it on `main` at `d93c121`: `node tools/verify.js index.html --baseline <v0.1>` PASS (6 checks) in 58.8 s, lockstep 674,462 ticks with 0 differences; `poster-pass/check.js` PASS (9 checks) in 62.7 s; the live page's SHA-1 equals `main`'s `index.html` (`86dace47…`) and reads v0.2; no open pull requests. A copy is in Box.
+
+## 2026-11-24 | session 11 | web
+- decided: the owner accepted the four-item "stable" list as written (question 1 of report 008). Items 1 and 3 and the first half of item 2 are built. Left: the jump poses (v0.3), then the smaller notes. When those are built the game is "stable", which is what the claude-works submission waits on.
+- decided: confirmed by the owner: no fail state, no timer or score, and no backtracking. Backtracking means returning to earlier areas; a local trip like the ravine is fine. This was a proposal from session 2 until now. Recorded in `CLAUDE.md` and under Ruled out in `FEATURES.md`.
+- decided: the closing card gets a credit line, in the owner's words: "by Satej Patil · made with Claude Code" (question 3).
+- decided: breakable floors stay under Ideas as a possible mechanic, not planned (question 5). If they're ever planned: a slam, not a slash; small pockets, not a second area; and Clawd has the move from the start. Controls and safety are still open.
+- open: the phone check. The owner's message kept the template's placeholder ("[all fine / what felt off]") where the result would go, so nothing was fixed for it.
