@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 "use strict";
 /*
- * Poster-pass browser check (v0.2). Runs the real game in headless Chromium and drives it
- * synchronously: requestAnimationFrame is stubbed out, so the render loop can't interleave
- * and every result is repeatable.
+ * Poster-pass browser check (v0.2; the pose check came with v0.3). Runs the real game in
+ * headless Chromium and drives it synchronously: requestAnimationFrame is stubbed out, so
+ * the render loop can't interleave and every result is repeatable.
  *
  *   node .claude/context/plans/poster-pass/check.js [index.html] [outdir]
  *
@@ -13,6 +13,9 @@
  *             ending; no stale jump fires on the first tick of the new walk
  *   pixels    at a fractional scale (2.5) every sprite pixel of Clawd is the same whole
  *             number of device pixels wide
+ *   poses     a full jump is drawn as the launch for its first 3 ticks, then the rise, the
+ *             top and the fall, in that order, and then he lands (read from the frames the
+ *             real render() draws, not worked out separately)
  *   errors    no page errors anywhere
  *
  * What it writes to outdir (default ./poster-pass-shots), for a person to look at:
@@ -155,6 +158,39 @@ async function checkPixels(page) {
     "pixels: at scale " + at.S + " every eye pixel is " + at.runs.join("/") + " device px wide (want " + at.k + ")");
 }
 
+// Which frame render() draws Clawd in, tick by tick through one full jump from flat ground.
+// The sprite is the only drawImage call placed at (-SPR_W / 2, -SPR_H); the image it draws
+// is looked up in BAKED to get its pose set and frame.
+async function checkPoses(page) {
+  await load(page);
+  const drawn = await page.evaluate(() => {
+    const names = new Map();
+    for (const [set, frames] of Object.entries(BAKED))
+      frames.forEach((f, i) => { for (const e of Object.values(f)) { names.set(e.right, set + " " + i); names.set(e.left, set + " " + i); } });
+    const realDraw = sctx.drawImage;
+    let last = null;
+    sctx.drawImage = function (img, x, y) {
+      if (arguments.length === 3 && x === -SPR_W / 2 && y === -SPR_H) last = names.get(img) || "?";
+      return realDraw.apply(this, arguments);
+    };
+    H.begin(); H.put(900, 374); H.ticks(60);
+    input.jumpPressed = true; input.jumpHeld = true;              // held: a full jump
+    const out = [];
+    for (let t = 0; t < 40; t++) { updatePlayer(STEP); updateCamera(); last = null; render(60, STEP); out.push(last); }
+    input.jumpHeld = false;
+    sctx.drawImage = realDraw;
+    return out;
+  });
+  const runs = [];                                                 // [pose, ticks] in order
+  for (const p of drawn) { if (runs.length && runs[runs.length - 1][0] === p) runs[runs.length - 1][1]++; else runs.push([p, 1]); }
+  const order = runs.map((r) => r[0]);
+  const ok = order.length >= 5 && order.slice(0, 4).join() === "jump 0,jump 1,top 0,fall 0" &&
+    runs[0][1] === 3 && runs.slice(1, 4).every((r) => r[1] >= 2) &&
+    order.slice(4).every((p) => p === "idle 0" || p === "idle 1");
+  report(ok, "poses: a full jump is drawn as " + runs.map((r) => r[0] + " x" + r[1]).join(", ") +
+    " (want the launch, jump 0, for 3 ticks, then jump 1, top 0, fall 0, then idle)");
+}
+
 async function shoot(browser, errors) {
   const page = await openPage(browser, 1280, 720, errors);
   for (const [name, scene] of Object.entries(SCENES)) {
@@ -181,6 +217,7 @@ async function shoot(browser, errors) {
   try {
     await checkEnding(await openPage(browser, 1280, 720, errors));
     await checkPixels(await openPage(browser, 1280, 720, errors));
+    await checkPoses(await openPage(browser, 1280, 720, errors));
     await shoot(browser, errors);
   } catch (e) {
     errors.push(String(e && e.stack || e));

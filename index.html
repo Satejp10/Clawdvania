@@ -74,7 +74,7 @@
   <div class="tbtn" id="tRight"><svg viewBox="0 0 24 24"><path d="M8.5 4.5 16 12l-7.5 7.5-1.8-1.8L12.4 12 6.7 6.3z"/></svg></div>
   <div class="tbtn" id="tJump"><svg viewBox="0 0 24 24"><path d="M12 4l6.5 6.5-1.8 1.8L13 8.6V20h-2V8.6l-3.7 3.7-1.8-1.8z"/></svg></div>
 </div>
-<div id="build-version">v0.2</div>
+<div id="build-version">v0.3</div>
 <div id="rotate"><div class="inner">
   <div class="phone">📱</div>
   <div style="margin-top:14px;font-size:18px;font-weight:600">Rotate your device</div>
@@ -132,6 +132,7 @@ const TUNING = {
   // Sprite
   idleFps: 3,             // idle breathe animation speed
   scuttleFps: 10,         // scuttle animation speed
+  apexPoseVy: 80,         // px/s: slower than this, up or down, shows the top-of-jump pose
 };
 
 // ============================================================================
@@ -251,13 +252,14 @@ const PALETTE = {
 const SPR_W = 16, SPR_H = 12;
 
 // Body poses only — eyes are stamped on at bake time (see EYES below), so
-// 6 poses x 4 expressions never has to be hand-drawn.
+// 10 poses x 4 expressions never has to be hand-drawn.
 // Boxy official Clawd: flat coral slab, side nubs, four stub legs.
 //
 // A frame may carry `hold: <seconds>` to override its set's baseline rate (see
 // ANIM_FPS / TIMING below). Even cadence is the default; uneven holds are how an
-// anticipation frame gets to sit while the frames around it snap past. No frame
-// sets one yet, so every set currently plays evenly.
+// anticipation frame gets to sit while the frames around it snap past. `jump` is
+// the set that uses them: its launch frame holds for 3 ticks, then the rise holds
+// for as long as Clawd keeps rising.
 const BODY = {
   idle: [
     { eyeY: 3, rows: [
@@ -333,8 +335,40 @@ const BODY = {
       "......oo....oo..",
     ]},
   ],
-  air: [
-    { eyeY: 3, rows: [   // legs splayed, dangling
+  // In the air the set follows the arc (see airPose): `jump` going up, `top` near the
+  // apex, `fall` coming down. `jump` runs on its own clock, started by the jump itself.
+  jump: [
+    { eyeY: 5, hold: 0.06, rows: [   // launch: gathered low, legs bent out. The anticipation:
+      "................",            // shown while the jump is already under way, so nothing
+      "................",            // waits for it. 0.06 s falls between the 3rd and 4th
+      "................",            // tick, so it lasts exactly 3 ticks.
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oo..oo.oo..oo.",
+    ]},
+    { eyeY: 1, hold: Infinity, rows: [   // rise: eyes up, arms swept down, legs trailing.
+      "..oooooooooooo..",                // Held until the arc turns over.
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...o..o..o..o...",
+      "................",
+    ]},
+  ],
+  top: [
+    { eyeY: 3, rows: [   // legs splayed, dangling (v0.2's one air pose)
       "................",
       "..oooooooooooo..",
       "..oooooooooooo..",
@@ -347,6 +381,22 @@ const BODY = {
       "...oo.oo.oo.oo..",
       "...oo.......oo..",
       "................",
+    ]},
+  ],
+  fall: [
+    { eyeY: 4, rows: [   // arms flung up, eyes on the ground, legs reaching for it
+      "................",
+      "o.oooooooooooo.o",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
     ]},
   ],
   // Drawn hooked onto a wall on the RIGHT (flipped for a left-hand wall):
@@ -432,7 +482,9 @@ for (const name of Object.keys(BODY)) {
 const ANIM_FPS = {
   idle:    TUNING.idleFps,
   scuttle: TUNING.scuttleFps,
-  air:     1,
+  jump:    1,   // both of its frames set their own hold
+  top:     1,
+  fall:    1,
   cling:   1,
 };
 // Cumulative frame end-times, built once at boot. ends[i] is when frame i stops
@@ -455,6 +507,14 @@ function frameAt(name, time) {
   for (let i = 0; i < ends.length; i++)        // don't let a stray one index -1
     if (p < ends[i]) return i;
   return ends.length - 1;                      // only reachable on float slop at p==total
+}
+// In the air the pose follows the arc, not a clock: `jump` while rising, `top` while
+// barely moving up or down, `fall` on the way down. Going by velocity makes it right for
+// every way of leaving the ground: a hop, a full jump, a wall kick, the double jump, or
+// just walking off a ledge. Visual only; the physics never reads it.
+function airPose() {
+  const band = TUNING.apexPoseVy;
+  return player.vy < -band ? "jump" : player.vy <= band ? "top" : "fall";
 }
 
 // ============================================================================
@@ -683,7 +743,7 @@ const player = {
   coyote: 0, buffer: 0, jumpCutDone: true,
   clinging: false, clingSide: 0, wallCoyote: 0, wallLock: 0,
   airJumpsLeft: 0,
-  animTime: 0,
+  animTime: 0, jumpT: 0,   // animation clocks: one always running, one since the last jump began
   fallT: 0, ouchT: 0, idleT: 0, blinkT: 0, blinkNext: 3,
 };
 
@@ -823,6 +883,7 @@ function updatePlayer(dt) {
     player.coyote = 0;
     player.buffer = 0;
     player.jumpCutDone = false;
+    player.jumpT = 0;
     fx.jumped = true;
     sndJump();
   } else if (player.buffer > 0 && player.wallCoyote > 0) {
@@ -834,6 +895,7 @@ function updatePlayer(dt) {
     player.buffer = 0;
     player.jumpCutDone = false;
     player.wallLock = T.wallLockMs / 1000;
+    player.jumpT = 0;
     fx.walljumped = true;
     sndJump();
   } else if (player.buffer > 0 && player.airJumpsLeft > 0) {
@@ -841,6 +903,7 @@ function updatePlayer(dt) {
     player.vy = -JUMP_VEL * T.airJumpMult;   // set, not added: a late beat still lifts you
     player.buffer = 0;
     player.jumpCutDone = false;              // the second beat is variable-height too
+    player.jumpT = 0;
     fx.airjumped = true;
     sndAirJump();
   }
@@ -911,8 +974,9 @@ function updatePlayer(dt) {
   fx.prevVy = player.vy;
   fx.prevGrounded = player.grounded;
 
-  // --- animation clock ---
+  // --- animation clocks (visual only) ---
   player.animTime += dt;
+  player.jumpT += dt;
 }
 
 // ============================================================================
@@ -1623,10 +1687,11 @@ function render(fps, dt) {
   const moving = Math.abs(player.vx) > 5;
   let poseSet;
   if (player.clinging)       poseSet = "cling";
-  else if (!player.grounded) poseSet = "air";
+  else if (!player.grounded) poseSet = airPose();
   else if (moving)           poseSet = "scuttle";
   else                       poseSet = "idle";
-  const frameIdx = frameAt(poseSet, player.animTime);
+  const frameIdx = frameAt(poseSet, poseSet === "jump" ? player.jumpT : player.animTime);
+  const launching = poseSet === "jump" && frameIdx === 0;
   const frame = BAKED[poseSet][frameIdx];
   if (poseSet === "scuttle") {                 // footstep ticks on frame changes
     if (frameIdx !== fx.stepFrame) { fx.stepFrame = frameIdx; sndStep(); }
@@ -1726,6 +1791,7 @@ function render(fps, dt) {
     sclY = 1 + st;
     sclX = 1 - st * 0.7;
   }
+  if (launching) sclX = sclY = 1;   // the launch frame is the crouch itself: stretching it would undo it
   // Drawn in device pixels at a whole-number scale (audit finding 4). At a fractional
   // scale the same sprite pixel comes out 2 px wide in one spot and 3 px in the next, so
   // his eyes changed width as he walked. Feet stay anchored on the hitbox.
@@ -1891,6 +1957,9 @@ function render(fps, dt) {
     sctx.font = "italic " + PS(9) + "px Georgia, serif";
     sctx.textAlign = "center";
     sctx.fillText("thanks for walking home", PX(VIEW_W / 2), PY(124));
+    sctx.fillStyle = "rgba(235,240,245," + (0.5 * k).toFixed(3) + ")";
+    sctx.font = PS(7.5) + "px Georgia, 'Times New Roman', serif";
+    sctx.fillText("by Satej Patil · made with Claude Code", PX(VIEW_W / 2), PY(146));
     if (game.endT > WALK_AGAIN_T) {
       const pulse = 0.45 + 0.3 * Math.sin(game.t * 2.2);
       sctx.fillStyle = "rgba(235,240,245," + (pulse * k).toFixed(3) + ")";
