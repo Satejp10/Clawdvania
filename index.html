@@ -132,6 +132,7 @@ const TUNING = {
   // Sprite
   idleFps: 3,             // idle breathe animation speed
   scuttleFps: 10,         // scuttle animation speed
+  apexPoseVy: 80,         // px/s: slower than this, up or down, shows the top-of-jump pose
 };
 
 // ============================================================================
@@ -251,13 +252,14 @@ const PALETTE = {
 const SPR_W = 16, SPR_H = 12;
 
 // Body poses only — eyes are stamped on at bake time (see EYES below), so
-// 6 poses x 4 expressions never has to be hand-drawn.
+// 10 poses x 4 expressions never has to be hand-drawn.
 // Boxy official Clawd: flat coral slab, side nubs, four stub legs.
 //
 // A frame may carry `hold: <seconds>` to override its set's baseline rate (see
 // ANIM_FPS / TIMING below). Even cadence is the default; uneven holds are how an
-// anticipation frame gets to sit while the frames around it snap past. No frame
-// sets one yet, so every set currently plays evenly.
+// anticipation frame gets to sit while the frames around it snap past. `jump` is
+// the set that uses them: its launch frame holds for 3 ticks, then the rise holds
+// for as long as Clawd keeps rising.
 const BODY = {
   idle: [
     { eyeY: 3, rows: [
@@ -333,8 +335,40 @@ const BODY = {
       "......oo....oo..",
     ]},
   ],
-  air: [
-    { eyeY: 3, rows: [   // legs splayed, dangling
+  // In the air the set follows the arc (see airPose): `jump` going up, `top` near the
+  // apex, `fall` coming down. `jump` runs on its own clock, started by the jump itself.
+  jump: [
+    { eyeY: 5, hold: 0.06, rows: [   // launch: gathered low, legs bent out. The anticipation:
+      "................",            // it shows for the first 3 ticks while the jump is already
+      "................",            // under way, so nothing waits for it.
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oo..oo.oo..oo.",
+    ]},
+    { eyeY: 1, hold: Infinity, rows: [   // rise: eyes up, arms swept down, legs trailing.
+      "..oooooooooooo..",                // Held until the arc turns over.
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...o..o..o..o...",
+      "................",
+    ]},
+  ],
+  top: [
+    { eyeY: 3, rows: [   // legs splayed, dangling (v0.2's one air pose)
       "................",
       "..oooooooooooo..",
       "..oooooooooooo..",
@@ -347,6 +381,22 @@ const BODY = {
       "...oo.oo.oo.oo..",
       "...oo.......oo..",
       "................",
+    ]},
+  ],
+  fall: [
+    { eyeY: 4, rows: [   // arms flung up, eyes on the ground, legs reaching for it
+      "................",
+      "o.oooooooooooo.o",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
     ]},
   ],
   // Drawn hooked onto a wall on the RIGHT (flipped for a left-hand wall):
@@ -432,7 +482,9 @@ for (const name of Object.keys(BODY)) {
 const ANIM_FPS = {
   idle:    TUNING.idleFps,
   scuttle: TUNING.scuttleFps,
-  air:     1,
+  jump:    1,   // both of its frames set their own hold
+  top:     1,
+  fall:    1,
   cling:   1,
 };
 // Cumulative frame end-times, built once at boot. ends[i] is when frame i stops
@@ -455,6 +507,14 @@ function frameAt(name, time) {
   for (let i = 0; i < ends.length; i++)        // don't let a stray one index -1
     if (p < ends[i]) return i;
   return ends.length - 1;                      // only reachable on float slop at p==total
+}
+// In the air the pose follows the arc, not a clock: `jump` while rising, `top` while
+// barely moving up or down, `fall` on the way down. Going by velocity makes it right for
+// every way of leaving the ground: a hop, a full jump, a wall kick, the double jump, or
+// just walking off a ledge. Visual only; the physics never reads it.
+function airPose() {
+  const band = TUNING.apexPoseVy;
+  return player.vy < -band ? "jump" : player.vy <= band ? "top" : "fall";
 }
 
 // ============================================================================
@@ -683,7 +743,7 @@ const player = {
   coyote: 0, buffer: 0, jumpCutDone: true,
   clinging: false, clingSide: 0, wallCoyote: 0, wallLock: 0,
   airJumpsLeft: 0,
-  animTime: 0,
+  animTime: 0, jumpT: 0,   // animation clocks: one always running, one since the last jump began
   fallT: 0, ouchT: 0, idleT: 0, blinkT: 0, blinkNext: 3,
 };
 
@@ -823,6 +883,7 @@ function updatePlayer(dt) {
     player.coyote = 0;
     player.buffer = 0;
     player.jumpCutDone = false;
+    player.jumpT = 0;
     fx.jumped = true;
     sndJump();
   } else if (player.buffer > 0 && player.wallCoyote > 0) {
@@ -834,6 +895,7 @@ function updatePlayer(dt) {
     player.buffer = 0;
     player.jumpCutDone = false;
     player.wallLock = T.wallLockMs / 1000;
+    player.jumpT = 0;
     fx.walljumped = true;
     sndJump();
   } else if (player.buffer > 0 && player.airJumpsLeft > 0) {
@@ -841,6 +903,7 @@ function updatePlayer(dt) {
     player.vy = -JUMP_VEL * T.airJumpMult;   // set, not added: a late beat still lifts you
     player.buffer = 0;
     player.jumpCutDone = false;              // the second beat is variable-height too
+    player.jumpT = 0;
     fx.airjumped = true;
     sndAirJump();
   }
@@ -911,8 +974,9 @@ function updatePlayer(dt) {
   fx.prevVy = player.vy;
   fx.prevGrounded = player.grounded;
 
-  // --- animation clock ---
+  // --- animation clocks (visual only) ---
   player.animTime += dt;
+  player.jumpT += dt;
 }
 
 // ============================================================================
@@ -1623,10 +1687,10 @@ function render(fps, dt) {
   const moving = Math.abs(player.vx) > 5;
   let poseSet;
   if (player.clinging)       poseSet = "cling";
-  else if (!player.grounded) poseSet = "air";
+  else if (!player.grounded) poseSet = airPose();
   else if (moving)           poseSet = "scuttle";
   else                       poseSet = "idle";
-  const frameIdx = frameAt(poseSet, player.animTime);
+  const frameIdx = frameAt(poseSet, poseSet === "jump" ? player.jumpT : player.animTime);
   const frame = BAKED[poseSet][frameIdx];
   if (poseSet === "scuttle") {                 // footstep ticks on frame changes
     if (frameIdx !== fx.stepFrame) { fx.stepFrame = frameIdx; sndStep(); }
