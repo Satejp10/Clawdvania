@@ -74,7 +74,7 @@
   <div class="tbtn" id="tRight"><svg viewBox="0 0 24 24"><path d="M8.5 4.5 16 12l-7.5 7.5-1.8-1.8L12.4 12 6.7 6.3z"/></svg></div>
   <div class="tbtn" id="tJump"><svg viewBox="0 0 24 24"><path d="M12 4l6.5 6.5-1.8 1.8L13 8.6V20h-2V8.6l-3.7 3.7-1.8-1.8z"/></svg></div>
 </div>
-<div id="build-version">v0.2</div>
+<div id="build-version">v0.3</div>
 <div id="rotate"><div class="inner">
   <div class="phone">📱</div>
   <div style="margin-top:14px;font-size:18px;font-weight:600">Rotate your device</div>
@@ -1691,6 +1691,7 @@ function render(fps, dt) {
   else if (moving)           poseSet = "scuttle";
   else                       poseSet = "idle";
   const frameIdx = frameAt(poseSet, poseSet === "jump" ? player.jumpT : player.animTime);
+  const launching = poseSet === "jump" && frameIdx === 0;
   const frame = BAKED[poseSet][frameIdx];
   if (poseSet === "scuttle") {                 // footstep ticks on frame changes
     if (frameIdx !== fx.stepFrame) { fx.stepFrame = frameIdx; sndStep(); }
@@ -1790,6 +1791,7 @@ function render(fps, dt) {
     sclY = 1 + st;
     sclX = 1 - st * 0.7;
   }
+  if (launching) sclX = sclY = 1;   // the launch frame is the crouch itself: stretching it would undo it
   // Drawn in device pixels at a whole-number scale (audit finding 4). At a fractional
   // scale the same sprite pixel comes out 2 px wide in one spot and 3 px in the next, so
   // his eyes changed width as he walked. Feet stay anchored on the hitbox.
@@ -1955,6 +1957,9 @@ function render(fps, dt) {
     sctx.font = "italic " + PS(9) + "px Georgia, serif";
     sctx.textAlign = "center";
     sctx.fillText("thanks for walking home", PX(VIEW_W / 2), PY(124));
+    sctx.fillStyle = "rgba(235,240,245," + (0.5 * k).toFixed(3) + ")";
+    sctx.font = PS(7.5) + "px Georgia, 'Times New Roman', serif";
+    sctx.fillText("by Satej Patil · made with Claude Code", PX(VIEW_W / 2), PY(146));
     if (game.endT > WALK_AGAIN_T) {
       const pulse = 0.45 + 0.3 * Math.sin(game.t * 2.2);
       sctx.fillStyle = "rgba(235,240,245," + (pulse * k).toFixed(3) + ")";

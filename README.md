@@ -56,6 +56,6 @@ The gaps in the ground are **ditches, not pits**: the first two bottom out in ea
 
 ## Status
 
-**Version 0.2**, shown in the bottom-right corner of the game.
+**Version 0.3**, shown in the bottom-right corner of the game.
 
 The walk home is complete: title, wisps, an optional ravine, deepening dusk, bench vista, an ending where Clawd steps inside and the walk can start over, and fully synthesized audio (wind, footsteps, pentatonic chimes, an ending swell) — still one file, zero assets. Feel-tuning continues; whatever comes after the walk comes later.
