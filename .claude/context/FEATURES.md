@@ -5,7 +5,7 @@ been ruled out. The details live in the linked plans, [`LOG.md`](LOG.md) and
 [`AUDIT.md`](../../AUDIT.md); this file is the index. When a feature changes state, or the
 owner suggests a new one, update this file in the same commit.
 
-Last updated 2026-11-24, for v0.3.
+Last updated 2026-11-25, with v0.3 live.
 
 ## Built
 
@@ -39,12 +39,34 @@ notes are left, and once they're built the game is "stable".
 
 | Feature | When |
 |---|---|
-| **The open smaller notes in `AUDIT.md`.** Count wisp pickups in the fixed 60 Hz step instead of the render pass, rename `const screen`, respect the reduced-motion setting, and add a LICENSE and a favicon. | After v0.3 merges. The last item on the "stable" list. |
+| **The open smaller notes in `AUDIT.md`.** Count wisp pickups in the fixed 60 Hz step instead of the render pass, rename `const screen`, respect the reduced-motion setting, and add a LICENSE and a favicon. | Next, unless the WebGL prototype goes first (proposed 2026-11-25, see Ideas). The last item on the "stable" list. |
 | **The claude-works submission.** | Paused until the game is "stable" (the owner's call, 2026-08-01). |
 
 ## Ideas
 
 Not agreed and not planned. Each one needs the owner's yes, then a plan.
+
+### A WebGL pass on the look and the animation
+
+*Proposed 2026-11-18 (Box, `overhaul-direction-2026-11-18.md`) and held back until the Canvas 2D
+look had been tried. On 2026-11-25 the owner judged v0.3 still too crude, and said it doesn't use
+what Opus 5.5 can do with animation, so that condition is met.*
+
+Proposed next step, waiting on the owner's yes: one screen (the title and the first stretch of
+the walk) rebuilt in a separate file, with the game logic untouched, and judged as a side-by-side
+video with v0.3. In it:
+
+- **Light that lights things.** The wisps, Clawd's lantern and the cottage window light the
+  ground, the trees and Clawd, and the dusk closes in around them.
+- **A sky and a world that move.** Clouds drift and catch the last light; grass and trees sway,
+  and the grass parts around Clawd.
+- **Clawd animated properly.** Legs that step in turn instead of three flip-book frames, a body
+  that bobs and leans, eyes that look at the wisps. Still pixel art unless the owner wants him
+  smooth.
+- **Finish:** bloom and tone mapping.
+
+About one session (a guess). Risks: GPU cost on phones, and scope creep, which is why it's one
+screen first.
 
 ### Breakable floors and a downward slam
 
@@ -74,16 +96,14 @@ Still to settle before planning (suggestions):
 - **Depth in the ravine.** The background moves up and down too, with roots and moss like
   the V2 poster. From the poster-pass plan.
 - **Out-of-focus leaves** in the bottom corners, like the posters. From the poster-pass plan.
-- **Move Clawd's start on phones.** He seems to start under the right-arrow button. That was
-  seen on an emulated phone, not a real one, so check it in the phone playtest.
+- **Move Clawd's start on phones.** He seemed to start under the right-arrow button on an
+  emulated phone. The owner's playtest on a real phone (2026-11-25) found nothing off.
 - **A third octave of wisp chimes.** Wisps 13–15 repeat the notes of 7–9. From the ravine
   plan.
 - **A nudge toward the ravine** for players who never look down. Wisp 13 is the only lure.
   From the ravine plan.
 - **A different sound below the ravine's lip,** such as muffled wind or a drip. From the
   ravine plan.
-- **A WebGL lighting pass:** real light, a moving sky, bloom. On hold, and only if v0.2 still
-  falls short of the posters. Notes: Box, `overhaul-direction-2026-11-18.md`.
 
 ## Ruled out
 
