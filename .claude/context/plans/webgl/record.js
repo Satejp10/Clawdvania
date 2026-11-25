@@ -11,10 +11,10 @@
  * The keys come from route.js. After every frame the two builds' positions and cameras
  * are compared, so the video also shows the physics is the same: any drift stops the run.
  *
- * Writes <outdir>/side-by-side.mp4, a smaller side-by-side.gif for the pull request, and
- * stills (title.jpg, play.jpg) comparing the two at chosen moments. The preview is a GIF
- * because the tool that writes pull request text rewrote a .webp image and a .mp4 link
- * into broken text (2026-11-25), while .png and .jpg images came through.
+ * Writes <outdir>/side-by-side.mp4, a smaller side-by-side.gif that GitHub plays when the
+ * file is opened on the site, and stills (title.jpg, play.jpg) comparing the two at chosen
+ * moments. Pull request text can't show them inline: the tool that writes it turned every
+ * image into broken text (2026-11-25), so the PR links the folder instead.
  */
 const { chromium } = require("playwright");
 const { spawn, execFileSync } = require("child_process");
@@ -101,8 +101,7 @@ function encoder(file) {
   await Promise.all(enc.map((e) => e.end()));
   await browser.close();
 
-  // stack them, labelled, then a smaller GIF for the pull request (kept under 5 MB, so
-  // GitHub's image proxy will show it)
+  // stack them, labelled, then a smaller GIF that plays in GitHub's file view
   const font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
   const label = (t) => "drawtext=fontfile=" + font + ":text='" + t +   // no commas or colons in t
     "':x=18:y=16:fontsize=26:fontcolor=white@0.92:box=1:boxcolor=black@0.45:boxborderw=10";
