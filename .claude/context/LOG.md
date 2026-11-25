@@ -400,3 +400,4 @@ Entry format:
 - broke/fixed: during the build, `half` (a reserved word in GLSL ES 3.00), a constant used before it was defined, a missing JS copy of the shaders' wind, light that faded too fast to show on the ground, a pickup flash that hid Clawd, and front grass that hid his legs. All fixed before the recording.
 - open: the owner's verdict (roll out, change or drop); Clawd pixel or smooth; speed on real GPUs and phones is unmeasured (the recording machine draws WebGL on the CPU).
 - next: the owner watches the video in the draft PR (and can open `prototype.html`). The smaller notes wait for the verdict.
+- broke/fixed: the tool that writes the PR's text rewrote its WebP preview and its MP4 link into broken text, while JPG links (and the PNG and JPG images in Satejp10/Clawdvania#23) came through. The preview is now a GIF under 5 MB, which `record.js` makes instead of the WebP, and the PR links the review folder for the MP4.

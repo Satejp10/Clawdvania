@@ -14,7 +14,7 @@ side-by-side video with v0.3.
 | `webgl/prototype.html` | The prototype. One file, opens from `file://` like the game. |
 | `webgl/route.js` | The scripted run used for the video, checked in the game's own physics. |
 | `webgl/record.js` | Records v0.3 and the prototype through that run, frame for frame. |
-| `../review/webgl-prototype/` | The video (`side-by-side.mp4`, a smaller `.webp`) and two stills. |
+| `../review/webgl-prototype/` | The video (`side-by-side.mp4`, a smaller `.gif`) and two stills. |
 
 `prototype.html` is v0.3's `index.html` with its drawing swapped out. Everything from the
 top of the script down to the wisps and particles is v0.3's code as it was: the tuning, the

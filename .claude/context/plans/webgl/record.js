@@ -11,8 +11,10 @@
  * The keys come from route.js. After every frame the two builds' positions and cameras
  * are compared, so the video also shows the physics is the same: any drift stops the run.
  *
- * Writes <outdir>/side-by-side.mp4, a smaller side-by-side.webp for the pull request, and
- * stills (title.jpg, play.jpg) comparing the two at chosen moments.
+ * Writes <outdir>/side-by-side.mp4, a smaller side-by-side.gif for the pull request, and
+ * stills (title.jpg, play.jpg) comparing the two at chosen moments. The preview is a GIF
+ * because the tool that writes pull request text rewrote a .webp image and a .mp4 link
+ * into broken text (2026-11-25), while .png and .jpg images came through.
  */
 const { chromium } = require("playwright");
 const { spawn, execFileSync } = require("child_process");
@@ -99,7 +101,8 @@ function encoder(file) {
   await Promise.all(enc.map((e) => e.end()));
   await browser.close();
 
-  // stack them, labelled, then a smaller animated WebP for the pull request
+  // stack them, labelled, then a smaller GIF for the pull request (kept under 5 MB, so
+  // GitHub's image proxy will show it)
   const font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
   const label = (t) => "drawtext=fontfile=" + font + ":text='" + t +   // no commas or colons in t
     "':x=18:y=16:fontsize=26:fontcolor=white@0.92:box=1:boxcolor=black@0.45:boxborderw=10";
@@ -107,8 +110,9 @@ function encoder(file) {
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", parts[0], "-i", parts[1], "-filter_complex",
     "[0]" + label(builds[0][0]) + "[a];[1]" + label(builds[1][0]) + "[b];[a][b]vstack",
     "-c:v", "libx264", "-crf", "21", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", mp4]);
-  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", mp4, "-vf", "fps=15,scale=640:-2:flags=lanczos",
-    "-c:v", "libwebp_anim", "-q:v", "62", "-compression_level", "6", "-loop", "0", path.join(out, "side-by-side.webp")]);
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", mp4, "-vf",
+    "fps=8,scale=400:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=160:stats_mode=diff[p];" +
+    "[b][p]paletteuse=dither=bayer:bayer_scale=2:diff_mode=rectangle", "-loop", "0", path.join(out, "side-by-side.gif")]);
   for (const name of Object.keys(STILLS)) {
     if (!fs.existsSync(path.join(out, name + "-1.jpg"))) continue;
     execFileSync("montage", [path.join(out, name + "-0.jpg"), path.join(out, name + "-1.jpg"), "-tile", "1x", "-geometry", "+0+6",
@@ -116,7 +120,7 @@ function encoder(file) {
     for (let i = 0; i < 2; i++) fs.unlinkSync(path.join(out, name + "-" + i + ".jpg"));
   }
   for (const p of parts) fs.unlinkSync(p);
-  for (const f of ["side-by-side.mp4", "side-by-side.webp", "title.jpg", "play.jpg"]) if (fs.existsSync(path.join(out, f)))
+  for (const f of ["side-by-side.mp4", "side-by-side.gif", "title.jpg", "play.jpg"]) if (fs.existsSync(path.join(out, f)))
     console.log(f, (fs.statSync(path.join(out, f)).size / 1e6).toFixed(2) + " MB");
   console.log("done in", ((Date.now() - t0) / 1000).toFixed(0) + "s");
 })().catch((e) => { console.error(e); process.exit(1); });
