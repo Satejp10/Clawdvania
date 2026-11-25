@@ -39,7 +39,7 @@ notes are left, and once they're built the game is "stable".
 
 | Feature | When |
 |---|---|
-| **The open smaller notes in `AUDIT.md`.** Count wisp pickups in the fixed 60 Hz step instead of the render pass, rename `const screen`, respect the reduced-motion setting, and add a LICENSE and a favicon. | Next, unless the WebGL prototype goes first (proposed 2026-11-25, see Ideas). The last item on the "stable" list. |
+| **The open smaller notes in `AUDIT.md`.** Count wisp pickups in the fixed 60 Hz step instead of the render pass, rename `const screen`, respect the reduced-motion setting, and add a LICENSE and a favicon. | After the owner's verdict on the WebGL prototype (built 2026-11-25, see Ideas), because two of them (`const screen`, reduced motion) touch the drawing code it would replace. The last item on the "stable" list. |
 | **The claude-works submission.** | Paused until the game is "stable" (the owner's call, 2026-08-01). |
 
 ## Ideas
@@ -52,9 +52,10 @@ Not agreed and not planned. Each one needs the owner's yes, then a plan.
 look had been tried. On 2026-11-25 the owner judged v0.3 still too crude, and said it doesn't use
 what Opus 5.5 can do with animation, so that condition is met.*
 
-Proposed next step, waiting on the owner's yes: one screen (the title and the first stretch of
-the walk) rebuilt in a separate file, with the game logic untouched, and judged as a side-by-side
-video with v0.3. In it:
+**Prototype built 2026-11-25, waiting on the owner's verdict.** The owner said go the same day.
+It's a separate file with v0.3's game logic untouched, polished on one screen (the title and the
+first stretch of the walk) but playable to the end: `plans/webgl.md`. Judged from a side-by-side
+video with v0.3 in `review/webgl-prototype/`. In it:
 
 - **Light that lights things.** The wisps, Clawd's lantern and the cottage window light the
   ground, the trees and Clawd, and the dusk closes in around them.
@@ -65,8 +66,9 @@ video with v0.3. In it:
   smooth.
 - **Finish:** bloom and tone mapping.
 
-About one session (a guess). Risks: GPU cost on phones, and scope creep, which is why it's one
-screen first.
+It took one session. Not yet known: its speed on real GPUs and phones (the recording machine
+draws WebGL on the CPU). Open: roll it out, change it or drop it, and whether Clawd stays pixel
+art.
 
 ### Breakable floors and a downward slam
 
