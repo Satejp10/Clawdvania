@@ -1,0 +1,2931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Clawdvania — WebGL prototype</title>
+<meta name="description" content="Clawd the pixel crab walks home at dusk. Metroidvania movement, none of the combat. One HTML file, zero assets, vanilla Canvas 2D.">
+<meta name="theme-color" content="#1a1526">
+<!-- Link previews. These are read by crawlers only — the game never fetches the
+     image, so it still runs from file:// with nothing to load. The URL has to be
+     absolute because a crawler resolves it against its own host, not this page. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Clawdvania">
+<meta property="og:url" content="https://satejp10.github.io/Clawdvania/">
+<meta property="og:title" content="Clawdvania — a walk home at dusk">
+<meta property="og:description" content="Clawd the pixel crab walks home at dusk. Metroidvania movement, none of the combat. One HTML file, zero assets, vanilla Canvas 2D.">
+<meta property="og:image" content="https://satejp10.github.io/Clawdvania/docs/thumbnail.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="750">
+<meta property="og:image:alt" content="The Clawdvania title screen: dusk over autumn hills, drifting leaves and wisps, with Clawd the orange pixel crab on the ground at the left.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Clawdvania — a walk home at dusk">
+<meta name="twitter:description" content="Clawd the pixel crab walks home at dusk. Metroidvania movement, none of the combat. One HTML file, zero assets, vanilla Canvas 2D.">
+<meta name="twitter:image" content="https://satejp10.github.io/Clawdvania/docs/thumbnail.png">
+<meta name="twitter:image:alt" content="The Clawdvania title screen: dusk over autumn hills, with Clawd the orange pixel crab on the ground at the left.">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden;
+               overscroll-behavior: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; position: absolute; left: 0; top: 0; image-rendering: auto; touch-action: none; }
+  #hud { pointer-events: none; }
+
+  /* --- touch controls (shown only on coarse-pointer devices, see JS) --- */
+  #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 5;
+           font-family: system-ui, sans-serif; }
+  #touch.on { display: block; }
+  .tbtn {
+    position: absolute; pointer-events: auto; touch-action: none;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; border: 1.5px solid rgba(238,197,132,0.35);
+    background: radial-gradient(circle at 35% 30%, rgba(70,58,82,0.55), rgba(26,21,38,0.65));
+    color: rgba(238,197,132,0.85);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tbtn:active, .tbtn.held { background: radial-gradient(circle at 35% 30%, rgba(201,138,74,0.55), rgba(43,35,56,0.7));
+                             border-color: rgba(238,197,132,0.7); color: #ffe9c4; }
+  .tbtn svg { width: 46%; height: 46%; fill: currentColor; }
+  #tLeft  { left: max(4vw, env(safe-area-inset-left)); bottom: 6vh; width: 17vmin; height: 17vmin; }
+  #tRight { left: calc(max(4vw, env(safe-area-inset-left)) + 20vmin); bottom: 6vh; width: 17vmin; height: 17vmin; }
+  #tJump  { right: max(5vw, env(safe-area-inset-right)); bottom: 7vh; width: 21vmin; height: 21vmin; }
+
+  /* --- portrait "rotate your device" overlay (touch devices only) --- */
+  #rotate { display: none; position: fixed; inset: 0; z-index: 10;
+            background: linear-gradient(#31406b, #5d5a7e 55%, #a5776c 90%, #c99a6d);
+            color: #ffe9c4; text-align: center;
+            font-family: system-ui, sans-serif; }
+  #rotate .inner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+  #rotate .phone { font-size: 64px; display: inline-block; animation: tilt 1.6s ease-in-out infinite; }
+  @keyframes tilt { 0%, 25% { transform: rotate(0deg); } 60%, 100% { transform: rotate(90deg); } }
+  body.portrait-touch #rotate { display: block; }
+
+  /* --- build version, bottom-right; the same number is in README.md --- */
+  #build-version { position: fixed; right: 10px; bottom: 8px; z-index: 6; pointer-events: none;
+                   padding: 2px 7px; border-radius: 6px; background: rgba(26,21,38,0.55);
+                   color: rgba(238,197,132,0.85); font: 12px/1.4 system-ui, sans-serif;
+                   letter-spacing: 0.04em; user-select: none; }
+  #touch.on ~ #build-version { display: none; }  /* touch screens: the jump button sits in this corner */
+</style>
+</head>
+<body>
+<canvas id="screen"></canvas>
+<canvas id="hud"></canvas>
+<div id="touch">
+  <div class="tbtn" id="tLeft"><svg viewBox="0 0 24 24"><path d="M15.5 4.5 8 12l7.5 7.5 1.8-1.8L11.6 12l5.7-5.7z"/></svg></div>
+  <div class="tbtn" id="tRight"><svg viewBox="0 0 24 24"><path d="M8.5 4.5 16 12l-7.5 7.5-1.8-1.8L12.4 12 6.7 6.3z"/></svg></div>
+  <div class="tbtn" id="tJump"><svg viewBox="0 0 24 24"><path d="M12 4l6.5 6.5-1.8 1.8L13 8.6V20h-2V8.6l-3.7 3.7-1.8-1.8z"/></svg></div>
+</div>
+<div id="build-version">WebGL prototype</div>
+<div id="rotate"><div class="inner">
+  <div class="phone">📱</div>
+  <div style="margin-top:14px;font-size:18px;font-weight:600">Rotate your device</div>
+  <div style="margin-top:6px;font-size:13px;opacity:.75">Clawdvania plays in landscape</div>
+</div></div>
+<script>
+"use strict";
+
+// ============================================================================
+// TUNING — every feel constant lives here. Tweak, refresh, replay.
+// Units: px, px/s, px/s^2, seconds (ms where named *Ms).
+// ============================================================================
+const TUNING = {
+  // Run
+  runMax: 140,            // px/s top ground speed
+  groundAccelTime: 0.10,  // s to reach runMax on ground
+  airControl: 0.75,       // fraction of ground accel while airborne
+  groundFriction: 1600,   // px/s^2 decel when no input on ground
+  airFriction: 350,       // px/s^2 decel when no input in air
+
+  // Jump (gravity + jump velocity are DERIVED from these two)
+  jumpApexTiles: 3.25,    // apex height in tiles
+  timeToApex: 0.32,       // s from takeoff to apex
+  fallGravityMult: 1.7,   // gravity multiplier while falling
+  jumpCutMult: 0.4,       // vy multiplier on jump release while rising
+  maxFallSpeed: 300,      // px/s fall cap (also anti-tunneling)
+
+  // Wall cling — hold the direction INTO the wall to hang on (Mantis Claw style).
+  // Let go of that direction and Clawd drops; tap jump and he kicks off.
+  wallSlideSpeed: 40,     // px/s the cling slides down at
+  wallJumpMult: 0.98,     // fraction of JUMP_VEL on a kick-off
+  wallJumpVx: 155,        // px/s pushed away from the wall
+  wallLockMs: 130,        // horizontal input ignored after a kick-off, so you clear the wall
+  wallCoyoteMs: 90,       // grace to still kick off just after sliding past the wall's end
+
+  // Double jump — one extra beat in the air. Refreshed by ground contact AND by
+  // catching a wall, so a cling-and-kick chain never strands you without it.
+  airJumps: 1,            // extra jumps between one wall/ground touch and the next
+  airJumpMult: 0.86,      // fraction of JUMP_VEL — lighter than a standing jump
+
+  // Forgiveness — the stuff "feels good" is made of
+  coyoteMs: 100,          // grace after walking off a ledge
+  jumpBufferMs: 120,      // early jump press remembered before landing
+
+  // Player
+  hitboxW: 14,
+  hitboxH: 10,
+
+  // Camera
+  camLerp: 0.12,          // per-tick lerp factor toward focus (at 60Hz)
+  camDeadzoneX: 24,       // px half-width the focus can wander without pull
+  camDeadzoneY: 12,
+  camLookahead: 40,       // px shifted toward facing direction
+
+  // Sprite
+  idleFps: 3,             // idle breathe animation speed
+  scuttleFps: 10,         // scuttle animation speed
+  apexPoseVy: 80,         // px/s: slower than this, up or down, shows the top-of-jump pose
+};
+
+// ============================================================================
+// Constants (not feel — structure)
+// ============================================================================
+const VIEW_W = 512, VIEW_H = 288;   // design viewport (16:9). Smaller = more zoomed-in.
+const TILE = 16;
+const STEP = 1 / 60;
+
+// Derived jump physics: h = 1/2 g t^2  =>  g = 2h/t^2 ; v = g t = 2h/t
+const APEX_PX  = TUNING.jumpApexTiles * TILE;
+const GRAV_RISE = 2 * APEX_PX / (TUNING.timeToApex * TUNING.timeToApex);
+const JUMP_VEL  = 2 * APEX_PX / TUNING.timeToApex;
+
+// ============================================================================
+// Level — array of strings, 1 char per tile. '#' solid, '.' empty, 'P' spawn,
+// ':' hollow (empty, but roofed: the baker paints rock behind it so the sky
+// doesn't show through the hillside).
+// 112 wide x 38 tall. The walk is rows 0-26; rows 26-37 are the ravine.
+// Cols 89-110: the homecoming meadow (cottage is drawn art, not tiles).
+// Row 16 cols 20-23: secret ledge. Perch at 85-88 is the vista bench.
+// The first two gaps in rows 24-25 are ditches, not pits: row 26 is solid under
+// them, so they bottom out in drawn earth two tiles down. Step in, hop out (or
+// cling your way up the side).
+// The third gap (cols 68-72) is the mouth of the ravine, an optional side pocket
+// under the walk. The gorge drops to a floor at row 36, with one-tile rungs on
+// alternating walls every two rows, so plain jumps climb back out. Off its left
+// side, through a door at col 67 rows 34-35, are two roofed hollows: a grotto
+// (cols 62-66) and a three-wide chimney (cols 58-60). See RAVINE below.
+// Cols 0 and 111 are empty above the floor: solidAt already bounds the room, so
+// tiles there only baked into dark pillars standing in the sky. The floor rows
+// keep theirs — blanking those would open a one-tile well at each end.
+// ============================================================================
+const LEVEL = [
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "................................................................................................................",
+  "....................####........................................................................................",
+  ".....................................................................................####.......................",
+  ".....................................#####......................................................................",
+  "..............#####.............................................................................................",
+  "..................................###.........................####..............####............................",
+  "......#####.................................##......###.........................................................",
+  "..............................####..........##.............##.............####..................................",
+  "...P..........................####..........##.............##...................................................",
+  "####################....######################....##################.....#######################################",
+  "####################....######################....##################.....#######################################",
+  "####################################################################....########################################",
+  "##########################################################:::#######.....#######################################",
+  "##########################################################:::########....#######################################",
+  "##########################################################:::#######.....#######################################",
+  "##########################################################:::#:::::#....########################################",
+  "##########################################################:::#:::::#.....#######################################",
+  "##########################################################:::#:::::##....#######################################",
+  "##########################################################:::::::::#.....#######################################",
+  "##########################################################::::::::::....########################################",
+  "##########################################################::::::::::....########################################",
+  "################################################################################################################",
+  "################################################################################################################",
+];
+
+// Parse level
+const ROOM_W = LEVEL[0].length * TILE;
+const ROOM_H = LEVEL.length * TILE;
+// The walk happens in the top 27 rows; everything below them is the ravine.
+// The surface camera still clamps to SURFACE_H, so the walk is framed as it always was.
+const SURFACE_H = 27 * TILE;
+const RAVINE = {
+  x0: 58 * TILE, x1: 73 * TILE,             // inside faces of its outer walls
+  gorgeX0: 68 * TILE, gorgeX1: 73 * TILE,   // the open slot under the ditch
+  lipY: 24 * TILE,                          // the surface line it is cut into
+  floorY: 36 * TILE,                        // its floor
+  panTime: 0.5,                             // s for the camera to tilt down into it, or back up
+};
+RAVINE.camX = (RAVINE.x0 + RAVINE.x1) / 2 - VIEW_W / 2;   // one fixed frame that shows all of it
+let SPAWN = { x: 3 * TILE, y: 13 * TILE };
+for (let r = 0; r < LEVEL.length; r++) {
+  if (LEVEL[r].length !== LEVEL[0].length) console.error("LEVEL row " + r + " has length " + LEVEL[r].length + ", expected " + LEVEL[0].length);
+  const c = LEVEL[r].indexOf("P");
+  if (c >= 0) SPAWN = { x: c * TILE + (TILE - TUNING.hitboxW) / 2, y: (r + 1) * TILE - TUNING.hitboxH };
+}
+
+function solidAt(px, py) {
+  if (px < 0 || px >= ROOM_W) return true;      // side walls
+  if (py < 0) return false;                     // open sky
+  if (py >= ROOM_H) return true;                // solid below room
+  const ch = LEVEL[(py / TILE) | 0][(px / TILE) | 0];
+  return ch === "#";
+}
+
+// ============================================================================
+// Clawd sprite — inline pixel arrays, zero asset files.
+// Palette: . transparent  d dark-coral  o coral  l light  w white  b black
+// Frames are drawn facing RIGHT; flipped at draw time when facing left.
+// ============================================================================
+const PALETTE = {
+  d: "#a94a2d",
+  o: "#d97757",  // Claude coral
+  l: "#f09b7d",
+  w: "#ffffff",
+  b: "#1d130e",
+};
+
+const SPR_W = 16, SPR_H = 12;
+
+// Body poses only — eyes are stamped on at bake time (see EYES below), so
+// 10 poses x 4 expressions never has to be hand-drawn.
+// Boxy official Clawd: flat coral slab, side nubs, four stub legs.
+//
+// A frame may carry `hold: <seconds>` to override its set's baseline rate (see
+// ANIM_FPS / TIMING below). Even cadence is the default; uneven holds are how an
+// anticipation frame gets to sit while the frames around it snap past. `jump` is
+// the set that uses them: its launch frame holds for 3 ticks, then the rise holds
+// for as long as Clawd keeps rising.
+const BODY = {
+  idle: [
+    { eyeY: 3, rows: [
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+    ]},
+    { eyeY: 4, rows: [   // breathe: body settles 1px, legs compress
+      "................",
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+    ]},
+  ],
+  scuttle: [
+    { eyeY: 3, rows: [   // legs 1 & 3 planted
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...oo....oo.....",
+    ]},
+    { eyeY: 3, rows: [   // all planted
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+    ]},
+    { eyeY: 3, rows: [   // legs 2 & 4 planted
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "......oo....oo..",
+    ]},
+  ],
+  // In the air the set follows the arc (see airPose): `jump` going up, `top` near the
+  // apex, `fall` coming down. `jump` runs on its own clock, started by the jump itself.
+  jump: [
+    { eyeY: 5, hold: 0.06, rows: [   // launch: gathered low, legs bent out. The anticipation:
+      "................",            // shown while the jump is already under way, so nothing
+      "................",            // waits for it. 0.06 s falls between the 3rd and 4th
+      "................",            // tick, so it lasts exactly 3 ticks.
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oo..oo.oo..oo.",
+    ]},
+    { eyeY: 1, hold: Infinity, rows: [   // rise: eyes up, arms swept down, legs trailing.
+      "..oooooooooooo..",                // Held until the arc turns over.
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...o..o..o..o...",
+      "................",
+    ]},
+  ],
+  top: [
+    { eyeY: 3, rows: [   // legs splayed, dangling (v0.2's one air pose)
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.......oo..",
+      "................",
+    ]},
+  ],
+  fall: [
+    { eyeY: 4, rows: [   // arms flung up, eyes on the ground, legs reaching for it
+      "................",
+      "o.oooooooooooo.o",
+      "oooooooooooooooo",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "..oooooooooooo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+      "...oo.oo.oo.oo..",
+    ]},
+  ],
+  // Drawn hooked onto a wall on the RIGHT (flipped for a left-hand wall):
+  // wall-side legs reach out and grip, far-side legs tuck up under the shell.
+  cling: [
+    { eyeY: 3, rows: [
+      "................",
+      "..oooooooooooo..",
+      "..oooooooooooo.o",
+      "..oooooooooooo..",
+      "oooooooooooooooo",
+      "oooooooooooooooo",
+      "..oooooooooooo.o",
+      "..oooooooooooo..",
+      "..oooooooooooo.o",
+      "....oo.oo.oo.oo.",
+      "........oo.oo...",
+      "................",
+    ]},
+  ],
+};
+
+// Eye variants, drawn for the LEFT eye and mirrored for the right.
+// dx = offset from the eye anchor column, dy = offset from the frame's eyeY.
+const EYE_L_COL = 5, EYE_R_COL = 10;
+const EYES = {
+  open:  { dx: 0,  dy: 0, rows: ["b", "b"] },
+  blink: { dx: 0,  dy: 1, rows: ["b"] },
+  ouch:  { dx: -1, dy: 0, rows: ["b.", ".b", "b."] },   // >_<
+  happy: { dx: -1, dy: 0, rows: [".b.", "b.b"] },       // ^_^
+};
+
+function stampEyes(rows, eyeY, v) {
+  const grid = rows.map(r => r.padEnd(SPR_W, ".").split(""));
+  const stamp = (vrows, colLeft) => {
+    for (let dy = 0; dy < vrows.length; dy++)
+      for (let dx = 0; dx < vrows[dy].length; dx++)
+        if (vrows[dy][dx] !== ".") grid[eyeY + dy][colLeft + dx] = vrows[dy][dx];
+  };
+  const w = v.rows[0].length;
+  stamp(v.rows, EYE_L_COL + v.dx);
+  const mirrored = v.rows.map(r => r.split("").reverse().join(""));
+  stamp(mirrored, EYE_R_COL - v.dx - w + 1);
+  return grid.map(r => r.join(""));
+}
+
+// Pre-render every frame (and its mirror) to offscreen canvases at boot.
+function bakeFrame(rows, flip) {
+  const cv = document.createElement("canvas");
+  cv.width = SPR_W; cv.height = SPR_H;
+  const c = cv.getContext("2d");
+  const img = c.createImageData(SPR_W, SPR_H);
+  for (let y = 0; y < SPR_H; y++) {
+    const row = (rows[y] || "").padEnd(SPR_W, ".");
+    for (let x = 0; x < SPR_W; x++) {
+      const ch = row[flip ? SPR_W - 1 - x : x];
+      const hex = PALETTE[ch];
+      if (!hex) continue;
+      const i = (y * SPR_W + x) * 4;
+      img.data[i]     = parseInt(hex.slice(1, 3), 16);
+      img.data[i + 1] = parseInt(hex.slice(3, 5), 16);
+      img.data[i + 2] = parseInt(hex.slice(5, 7), 16);
+      img.data[i + 3] = 255;
+    }
+  }
+  c.putImageData(img, 0, 0);
+  return cv;
+}
+// BAKED[set][frame][expr] = { right, left } — every pose x expression, once.
+const BAKED = {};
+for (const name of Object.keys(BODY)) {
+  BAKED[name] = BODY[name].map(f => {
+    const out = {};
+    for (const [ename, ev] of Object.entries(EYES)) {
+      const rows = stampEyes(f.rows, f.eyeY + ev.dy, ev);
+      out[ename] = { right: bakeFrame(rows, false), left: bakeFrame(rows, true) };
+    }
+    return out;
+  });
+}
+
+// Baseline frame rate per pose set. A frame's own `hold` beats this.
+const ANIM_FPS = {
+  idle:    TUNING.idleFps,
+  scuttle: TUNING.scuttleFps,
+  jump:    1,   // both of its frames set their own hold
+  top:     1,
+  fall:    1,
+  cling:   1,
+};
+// Cumulative frame end-times, built once at boot. ends[i] is when frame i stops
+// being shown; total is one full cycle. Storing ends rather than durations makes
+// the lookup a single walk with no running sum per render.
+const TIMING = {};
+for (const name of Object.keys(BODY)) {
+  const base = 1 / ANIM_FPS[name];
+  const ends = [];
+  let t = 0;
+  for (const f of BODY[name]) { t += (f.hold != null ? f.hold : base); ends.push(t); }
+  TIMING[name] = { ends, total: t };
+}
+// Which frame of `name` is showing at `time` seconds into the animation.
+function frameAt(name, time) {
+  const { ends, total } = TIMING[name];
+  if (ends.length === 1) return 0;
+  let p = time % total;
+  if (p < 0) p += total;                       // animTime never goes negative, but
+  for (let i = 0; i < ends.length; i++)        // don't let a stray one index -1
+    if (p < ends[i]) return i;
+  return ends.length - 1;                      // only reachable on float slop at p==total
+}
+// In the air the pose follows the arc, not a clock: `jump` while rising, `top` while
+// barely moving up or down, `fall` on the way down. Going by velocity makes it right for
+// every way of leaving the ground: a hop, a full jump, a wall kick, the double jump, or
+// just walking off a ledge. Visual only; the physics never reads it.
+function airPose() {
+  const band = TUNING.apexPoseVy;
+  return player.vy < -band ? "jump" : player.vy <= band ? "top" : "fall";
+}
+
+// ============================================================================
+// Game state — title / play / ending. The walk ends at the cottage door.
+// ============================================================================
+const game = { state: "title", t: 0, endT: 0, ended: false, tfade: 0 };
+const WALK_AGAIN_T = 11;   // s into the ending before a key or tap starts the walk over
+function startGame() {
+  initAudio();
+  if (game.state === "title") { game.state = "play"; playT = 0; }
+  else if (game.state === "ending" && game.endT > WALK_AGAIN_T) resetRun();
+}
+
+// ============================================================================
+// Audio — all synthesized (WebAudio), zero asset files. M toggles mute.
+// Quiet Hollow-Knight bed (wind, footsteps), Ori swells at the moments.
+// ============================================================================
+const AU = { ctx: null, master: null, click: null, muted: false, ambT: 5, ready: false };
+function initAudio() {
+  if (AU.ctx) { if (AU.ctx.state === "suspended") AU.ctx.resume().catch(() => {}); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try {
+    AU.ctx = new AC();
+    AU.master = AU.ctx.createGain();
+    AU.master.gain.value = AU.muted ? 0 : 0.8;
+    AU.master.connect(AU.ctx.destination);
+    // wind bed: looped brownish noise through a soft lowpass, slow swell LFO
+    const len = 2 * AU.ctx.sampleRate;
+    const buf = AU.ctx.createBuffer(1, len, AU.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let lastS = 0;
+    for (let i = 0; i < len; i++) { lastS = (lastS + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = lastS * 3.5; }
+    const src = AU.ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const lp = AU.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 420; lp.Q.value = 0.4;
+    const wg = AU.ctx.createGain(); wg.gain.value = 0.05;
+    const lfo = AU.ctx.createOscillator(); lfo.frequency.value = 0.07;
+    const lfoG = AU.ctx.createGain(); lfoG.gain.value = 0.025;
+    lfo.connect(lfoG); lfoG.connect(wg.gain);
+    src.connect(lp); lp.connect(wg); wg.connect(AU.master);
+    src.start(); lfo.start();
+    // short noise grain for footsteps
+    const cl = AU.ctx.createBuffer(1, (AU.ctx.sampleRate * 0.05) | 0, AU.ctx.sampleRate);
+    const cd = cl.getChannelData(0);
+    for (let i = 0; i < cd.length; i++) cd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / cd.length, 2);
+    AU.click = cl;
+    AU.ready = true;
+  } catch (e) { /* no audio; the game plays silent */ }
+}
+function toggleMute() {
+  AU.muted = !AU.muted;
+  if (AU.master) AU.master.gain.value = AU.muted ? 0 : 0.8;
+}
+function envG(t0, attack, peak, dur) {
+  const g = AU.ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(peak, t0 + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  g.connect(AU.master);
+  return g;
+}
+function pluck(freq, peak, dur, delay) {
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime + (delay || 0);
+  const o = AU.ctx.createOscillator(); o.type = "sine"; o.frequency.value = freq;
+  const o2 = AU.ctx.createOscillator(); o2.type = "sine"; o2.frequency.value = freq * 2;
+  o.connect(envG(t0, 0.005, peak, dur));
+  o2.connect(envG(t0, 0.005, peak * 0.25, dur * 0.6));
+  o.start(t0); o2.start(t0); o.stop(t0 + dur + 0.05); o2.stop(t0 + dur + 0.05);
+}
+const SCALE = [392, 440, 523.25, 587.33, 659.25, 784]; // G A C D E G pentatonic — no wrong notes
+function sndChime(n) {
+  if (!AU.ready) return;
+  const f = SCALE[(n - 1) % SCALE.length] * (n > SCALE.length ? 2 : 1);
+  pluck(f, 0.13, 0.8); pluck(f * 2, 0.04, 0.5, 0.04);
+}
+function sndJump() {
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  const o = AU.ctx.createOscillator(); o.type = "triangle";
+  o.frequency.setValueAtTime(240, t0);
+  o.frequency.exponentialRampToValueAtTime(430, t0 + 0.09);
+  o.connect(envG(t0, 0.008, 0.05, 0.14));
+  o.start(t0); o.stop(t0 + 0.2);
+}
+function sndAirJump() {                                    // the second beat: lighter, higher, shorter
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  const o = AU.ctx.createOscillator(); o.type = "triangle";
+  o.frequency.setValueAtTime(380, t0);
+  o.frequency.exponentialRampToValueAtTime(720, t0 + 0.075);
+  o.connect(envG(t0, 0.005, 0.035, 0.10));
+  o.start(t0); o.stop(t0 + 0.16);
+}
+function sndLand(impact) {
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  const o = AU.ctx.createOscillator(); o.type = "sine";
+  o.frequency.setValueAtTime(130, t0);
+  o.frequency.exponentialRampToValueAtTime(65, t0 + 0.1);
+  o.connect(envG(t0, 0.004, Math.min(0.14, 0.03 + impact / 3000), 0.13));
+  o.start(t0); o.stop(t0 + 0.18);
+}
+function sndStep() {
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  const s = AU.ctx.createBufferSource(); s.buffer = AU.click;
+  const bp = AU.ctx.createBiquadFilter(); bp.type = "bandpass";
+  bp.frequency.value = 1500 + Math.random() * 1100; bp.Q.value = 3;
+  s.connect(bp); bp.connect(envG(t0, 0.002, 0.035, 0.05));
+  s.start(t0);
+}
+function sndGrab() {                                       // soft chitinous catch on the wall
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  const s = AU.ctx.createBufferSource(); s.buffer = AU.click;
+  const bp = AU.ctx.createBiquadFilter(); bp.type = "bandpass";
+  bp.frequency.value = 480 + Math.random() * 260; bp.Q.value = 1.6;
+  s.connect(bp); bp.connect(envG(t0, 0.003, 0.05, 0.1));
+  s.start(t0);
+}
+function sndSwell() {
+  if (!AU.ready) return;
+  const t0 = AU.ctx.currentTime;
+  for (const f of [220, 277.18, 329.63, 440]) {          // warm A-major pad
+    const o = AU.ctx.createOscillator(); o.type = "triangle"; o.frequency.value = f;
+    const o2 = AU.ctx.createOscillator(); o2.type = "triangle"; o2.frequency.value = f * 1.003;
+    const lp = AU.ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 900;
+    const g = AU.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(0.035, t0 + 1.8);
+    g.gain.setValueAtTime(0.035, t0 + 3.2);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 6.5);
+    o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(AU.master);
+    o.start(t0); o2.start(t0); o.stop(t0 + 7); o2.stop(t0 + 7);
+  }
+  pluck(SCALE[2], 0.1, 1.2, 1.2); pluck(SCALE[4], 0.1, 1.2, 1.55); pluck(SCALE[5], 0.12, 1.8, 1.9);
+}
+function updateAmbient(dt, dusk) {
+  if (!AU.ready || game.state === "title") return;
+  AU.ambT -= dt;
+  if (AU.ambT <= 0) {
+    AU.ambT = 6 + Math.random() * 8;
+    pluck(SCALE[(Math.random() * SCALE.length) | 0] / 2, 0.03 + 0.015 * dusk, 2.2);
+  }
+}
+
+// ============================================================================
+// Input
+// ============================================================================
+const input = { left: false, right: false, jumpHeld: false, jumpPressed: false };
+let debugOn = false;
+
+const KEYMAP = {
+  ArrowLeft: "left", KeyA: "left",
+  ArrowRight: "right", KeyD: "right",
+  ArrowUp: "jump", KeyW: "jump", Space: "jump",
+};
+
+addEventListener("keydown", (e) => {
+  const act = KEYMAP[e.code];
+  if (act || e.code === "KeyR" || e.code === "Backquote" || e.code === "KeyM") e.preventDefault();
+  if (e.repeat) return;
+  startGame(); // any key dismisses the title (and still performs its action)
+  if (act === "left") input.left = true;
+  if (act === "right") input.right = true;
+  if (act === "jump") { input.jumpHeld = true; input.jumpPressed = true; }
+  if (e.code === "KeyR") resetRun();
+  if (e.code === "KeyM") toggleMute();
+  if (e.code === "Backquote") debugOn = !debugOn; // spec says D, but D also moves right; ` is the no-conflict toggle
+});
+addEventListener("pointerdown", startGame);
+addEventListener("keyup", (e) => {
+  const act = KEYMAP[e.code];
+  if (act === "left") input.left = false;
+  if (act === "right") input.right = false;
+  if (act === "jump") input.jumpHeld = false;
+});
+
+// --- touch controls (mobile) — pointer events for reliable multitouch ---
+// Buttons are always bound (cheap, testable); CSS visibility is gated on isTouch.
+const isTouch = matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
+
+const bindTouchBtn = (id, down, up) => {
+  const el = document.getElementById(id);
+  const press = (e) => { e.preventDefault(); el.classList.add("held"); down(); };
+  const release = (e) => { e.preventDefault(); el.classList.remove("held"); up(); };
+  el.addEventListener("pointerdown", press);
+  el.addEventListener("pointerup", release);
+  el.addEventListener("pointercancel", release);
+  el.addEventListener("pointerleave", release);
+  el.addEventListener("contextmenu", (e) => e.preventDefault());
+};
+bindTouchBtn("tLeft",  () => { input.left = true;  }, () => { input.left = false;  });
+bindTouchBtn("tRight", () => { input.right = true; }, () => { input.right = false; });
+bindTouchBtn("tJump",  () => { input.jumpHeld = true; input.jumpPressed = true; }, () => { input.jumpHeld = false; });
+
+if (isTouch) {
+  document.getElementById("touch").classList.add("on");
+
+  // landscape: overlay in portrait; try to lock orientation where allowed
+  // (lock needs fullscreen on most browsers — attempt on first tap, fail silently)
+  const updateOrient = () => {
+    document.body.classList.toggle("portrait-touch", innerHeight > innerWidth);
+  };
+  addEventListener("resize", updateOrient);
+  updateOrient();
+  let lockTried = false;
+  addEventListener("pointerdown", async () => {
+    if (lockTried) return;
+    lockTried = true;
+    try {
+      await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+      await window.screen.orientation.lock("landscape"); // window.screen — `screen` is shadowed by the canvas below
+    } catch (e) { /* not supported or denied — the rotate overlay covers it */ }
+  }, { once: false });
+}
+
+// ============================================================================
+// Player
+// ============================================================================
+const player = {
+  x: 0, y: 0, vx: 0, vy: 0,
+  w: TUNING.hitboxW, h: TUNING.hitboxH,
+  grounded: false, facing: 1,
+  coyote: 0, buffer: 0, jumpCutDone: true,
+  clinging: false, clingSide: 0, wallCoyote: 0, wallLock: 0,
+  airJumpsLeft: 0,
+  animTime: 0, jumpT: 0,   // animation clocks: one always running, one since the last jump began
+  fallT: 0, ouchT: 0, idleT: 0, blinkT: 0, blinkNext: 3,
+};
+
+// Render/audio event tracker — derived from physics transitions, never feeds back.
+const fx = {
+  prevVy: 0, prevGrounded: false,
+  landImpact: 0, jumped: false, walljumped: false, airjumped: false,  // consumed by render (dust, squash)
+  squash: 0, squashT: 0,
+  sitT: 0, kickT: 0, stepFrame: -1,
+};
+
+// Position only — this is what an out-of-bounds recovery wants. It deliberately
+// leaves the run alone, so it can fire mid-walk without undoing your progress.
+function resetPlayer() {
+  player.x = SPAWN.x; player.y = SPAWN.y;
+  player.vx = 0; player.vy = 0;
+  player.grounded = false; player.facing = 1;
+  player.coyote = 0; player.buffer = 0; player.jumpCutDone = true;
+  player.clinging = false; player.clingSide = 0; player.wallCoyote = 0; player.wallLock = 0;
+  player.airJumpsLeft = 0;
+  player.fallT = 0; player.ouchT = 0; player.idleT = 0; player.blinkT = 0; player.blinkNext = 3;
+  cam.x = clamp(player.x + player.w / 2 - VIEW_W / 2, 0, ROOM_W - VIEW_W);
+  cam.y = clamp(player.y + player.h / 2 - VIEW_H / 2, 0, SURFACE_H - VIEW_H);
+  cam.dive = 0; cam.inRavine = false;
+  cam.fx = player.x + player.w / 2;
+  cam.fy = player.y + player.h / 2;
+}
+
+// Start the walk over — what R means. Moving the crab back to spawn isn't enough
+// once the ending has fired: game.ended stays latched, so the door trigger is
+// spent forever, and the delivered wisps stay parked at the cottage eave. Undo
+// the whole run, not just the position. (wisps/wispCount/playT are declared
+// further down; this only ever runs from a keypress, long after they exist.)
+function resetRun() {
+  resetPlayer();
+  game.state = "play";
+  game.ended = false;
+  game.endT = 0;
+  playT = 0;
+  wispCount = 0;
+  for (const w of wisps) {
+    w.state = "idle";
+    w.x = w.hx; w.y = w.hy;          // back to the spot it drifts around
+    w.tx = 0; w.ty = 0; w.fx = 0; w.fy = 0; w.ft = 0; w.delay = 0;
+  }
+}
+
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+// Axis-separated AABB vs tile grid: move X, resolve, then Y, resolve.
+function moveAxis(axis, amount) {
+  if (axis === "x") player.x += amount; else player.y += amount;
+  const x0 = Math.floor(player.x), y0 = Math.floor(player.y);
+  const x1 = Math.ceil(player.x + player.w) - 1, y1 = Math.ceil(player.y + player.h) - 1;
+  const tx0 = Math.floor(x0 / TILE), tx1 = Math.floor(x1 / TILE);
+  const ty0 = Math.floor(y0 / TILE), ty1 = Math.floor(y1 / TILE);
+  let hit = false;
+  for (let ty = ty0; ty <= ty1; ty++) {
+    for (let tx = tx0; tx <= tx1; tx++) {
+      if (!solidAt(tx * TILE, ty * TILE)) continue;
+      hit = true;
+      if (axis === "x") {
+        if (amount > 0) player.x = tx * TILE - player.w;
+        else player.x = (tx + 1) * TILE;
+      } else {
+        if (amount > 0) { player.y = ty * TILE - player.h; player.grounded = true; }
+        else player.y = (ty + 1) * TILE;
+      }
+    }
+  }
+  return hit;
+}
+
+// Is there a solid tile flush against one side of the hitbox? (side: -1 left, +1 right)
+// The vertical probe is inset top and bottom so the lip of a floor you're standing
+// on, or a ceiling you're brushing, never reads as a grabbable wall.
+function wallAt(side) {
+  const px = side > 0 ? player.x + player.w : player.x - 1;
+  if (px < 0 || px >= ROOM_W) return false;   // the room edge stops you; it isn't something to hang from
+  const top = player.y + 1, bot = player.y + player.h - 2;
+  for (let py = top; py < bot; py += TILE) if (solidAt(px, py)) return true;
+  return solidAt(px, bot);
+}
+
+function updatePlayer(dt) {
+  const T = TUNING;
+
+  // --- timers ---
+  player.coyote = player.grounded ? T.coyoteMs / 1000 : Math.max(0, player.coyote - dt);
+  player.buffer = Math.max(0, player.buffer - dt);
+  player.wallLock = Math.max(0, player.wallLock - dt);
+  // Home: once the ending starts, input is ignored and Clawd stays at the door.
+  // (tools/verify.js resets the ending after every tick, so its checks never see this.)
+  const home = game.state === "ending";
+  if (input.jumpPressed) { if (!home) player.buffer = T.jumpBufferMs / 1000; input.jumpPressed = false; }
+
+  // --- horizontal (input is ignored briefly after a wall kick-off) ---
+  const dir = home ? 0 : (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  const accel = (T.runMax / T.groundAccelTime) * (player.grounded ? 1 : T.airControl);
+  if (dir !== 0 && player.wallLock <= 0) {
+    player.vx = clamp(player.vx + dir * accel * dt, -T.runMax, T.runMax);
+    player.facing = dir;
+  } else {
+    const fr = (player.grounded ? T.groundFriction : T.airFriction) * dt;
+    if (Math.abs(player.vx) <= fr) player.vx = 0;
+    else player.vx -= Math.sign(player.vx) * fr;
+  }
+
+  // --- wall cling: airborne, pressing into a wall, and a wall is actually there.
+  // You can only START a cling when you aren't rising, so jumping up a wall you're
+  // already hugging gives a full jump instead of instantly sticking to it. Once
+  // you're on, you stay on until you let go of the direction.
+  const wasClinging = player.clinging;
+  const canCling = !player.grounded && player.wallLock <= 0 && dir !== 0 &&
+                   (wasClinging || player.vy >= 0) && wallAt(dir);
+  if (canCling) {
+    if (!wasClinging) sndGrab();
+    player.clinging = true;
+    player.clingSide = dir;
+    player.facing = dir;                      // face the wall you're holding
+    player.vx = 0;
+    player.wallCoyote = T.wallCoyoteMs / 1000;
+    player.jumpCutDone = true;                // a cling ends any pending jump-cut
+    player.airJumpsLeft = T.airJumps;         // catching a wall gives the second beat back
+  } else {
+    player.clinging = false;
+    player.wallCoyote = Math.max(0, player.wallCoyote - dt);
+  }
+
+  // --- jump: ground beats a kick-off beats the air jump, when several are live ---
+  // Each branch announces itself. It used to be inferred further down from "vy went
+  // sharply negative", which fired a second time on every kick-off — an audibly
+  // doubled note — and couldn't tell the three kinds of jump apart at all.
+  if (player.buffer > 0 && player.coyote > 0) {
+    player.vy = -JUMP_VEL;
+    player.grounded = false;
+    player.coyote = 0;
+    player.buffer = 0;
+    player.jumpCutDone = false;
+    player.jumpT = 0;
+    fx.jumped = true;
+    sndJump();
+  } else if (player.buffer > 0 && player.wallCoyote > 0) {
+    player.vy = -JUMP_VEL * T.wallJumpMult;
+    player.vx = -player.clingSide * T.wallJumpVx;
+    player.facing = -player.clingSide;
+    player.clinging = false;
+    player.wallCoyote = 0;
+    player.buffer = 0;
+    player.jumpCutDone = false;
+    player.wallLock = T.wallLockMs / 1000;
+    player.jumpT = 0;
+    fx.walljumped = true;
+    sndJump();
+  } else if (player.buffer > 0 && player.airJumpsLeft > 0) {
+    player.airJumpsLeft--;
+    player.vy = -JUMP_VEL * T.airJumpMult;   // set, not added: a late beat still lifts you
+    player.buffer = 0;
+    player.jumpCutDone = false;              // the second beat is variable-height too
+    player.jumpT = 0;
+    fx.airjumped = true;
+    sndAirJump();
+  }
+  // variable height: cut upward velocity once on release while rising
+  if (!input.jumpHeld && player.vy < 0 && !player.jumpCutDone) {
+    player.vy *= T.jumpCutMult;
+    player.jumpCutDone = true;
+  }
+
+  // --- gravity (asymmetric); a cling swaps it for a slow, steady slide ---
+  if (player.clinging) {
+    player.vy = Math.min(player.vy + GRAV_RISE * dt, T.wallSlideSpeed);
+  } else {
+    const g = player.vy < 0 ? GRAV_RISE : GRAV_RISE * T.fallGravityMult;
+    player.vy = Math.min(player.vy + g * dt, T.maxFallSpeed);
+  }
+
+  // --- move & collide ---
+  const wasGroundedMoveX = moveAxis("x", player.vx * dt);
+  if (wasGroundedMoveX) player.vx = 0;
+  player.grounded = false;
+  const hitY = moveAxis("y", player.vy * dt);
+  if (hitY) player.vy = 0;
+
+  // landing ends a cling outright — no stale wall state while standing
+  if (player.grounded) { player.clinging = false; player.wallCoyote = 0; player.airJumpsLeft = T.airJumps; }
+
+  // fell out of a pit? (shouldn't happen — floor is solid — but belt & braces)
+  if (player.y > ROOM_H + 64) resetPlayer();
+
+  // --- expression bookkeeping (visual only) ---
+  if (!player.grounded && player.vy > 0) {
+    player.fallT += dt;
+  } else if (player.grounded) {
+    if (player.fallT > THEME.face.ouchFall) player.ouchT = THEME.face.ouchShow;
+    player.fallT = 0;
+  }
+  player.ouchT = Math.max(0, player.ouchT - dt);
+  player.idleT = (player.grounded && dir === 0 && Math.abs(player.vx) < 5) ? player.idleT + dt : 0;
+  player.blinkNext -= dt;
+  if (player.blinkNext <= 0) { player.blinkT = THEME.face.blinkLen; player.blinkNext = 2.5 + Math.random() * 2.5; }
+  player.blinkT = Math.max(0, player.blinkT - dt);
+
+  // --- fx & game events (visual/audio only, derived from transitions) ---
+  if (player.grounded && !fx.prevGrounded && fx.prevVy > 60) {
+    fx.landImpact = Math.max(fx.landImpact, fx.prevVy);
+    sndLand(fx.prevVy);
+  }
+  // bench sit: standing still on the vista stump
+  const onBench = player.grounded && dir === 0 && Math.abs(player.vx) < 5 &&
+    player.x + player.w / 2 > BENCH.x0 && player.x + player.w / 2 < BENCH.x1 &&
+    Math.abs(player.y + player.h - BENCH.feetY) < 1;
+  fx.sitT = onBench ? fx.sitT + dt : 0;
+  // arriving home: the walk ends at the cottage door
+  if (game.state === "play" && !game.ended && player.grounded &&
+      Math.abs(player.x + player.w / 2 - HOME.doorX) < 11) {
+    game.state = "ending"; game.ended = true; game.endT = 0;
+    let n = 0;
+    for (const w of wisps) {
+      if (w.state !== "orbit") continue;
+      w.state = "fly"; w.fx = w.x; w.fy = w.y; w.ft = 0; w.delay = 0.15 + n * 0.13;
+      w.tx = HOME.x + 6 + ((n + 1) * (HOME.w - 12)) / (wispCount + 1);
+      w.ty = HOME.eaveY - 5 - (n % 2) * 6;
+      n++;
+    }
+    sndSwell();
+  }
+  fx.prevVy = player.vy;
+  fx.prevGrounded = player.grounded;
+
+  // --- animation clocks (visual only) ---
+  player.animTime += dt;
+  player.jumpT += dt;
+}
+
+// ============================================================================
+// Camera — lerp follow, deadzone, facing lookahead, clamped to room.
+// ============================================================================
+const cam = { x: 0, y: 0, fx: 0, fy: 0, dive: 0, inRavine: false }; // fx/fy = focus point; dive = 0 on the surface, 1 settled in the ravine
+let camBias = 0; // extra gaze toward the meadow while sitting on the bench (visual)
+
+function updateCamera() {
+  const T = TUNING;
+  camBias += ((fx.sitT > 0.8 ? 85 : 0) - camBias) * 0.02;
+  const px = player.x + player.w / 2 + player.facing * T.camLookahead + camBias;
+  const py = player.y + player.h / 2;
+
+  // deadzone: focus only moves when the look point escapes the box
+  const dx = px - cam.fx;
+  if (dx > T.camDeadzoneX) cam.fx += dx - T.camDeadzoneX;
+  else if (dx < -T.camDeadzoneX) cam.fx += dx + T.camDeadzoneX;
+  const dy = py - cam.fy;
+  if (dy > T.camDeadzoneY) cam.fy += dy - T.camDeadzoneY;
+  else if (dy < -T.camDeadzoneY) cam.fy += dy + T.camDeadzoneY;
+
+  // The ravine is a fixed-frame room. Below the lip and inside its footprint the camera
+  // stops following and settles on one frame showing the whole pocket and the lips above
+  // it. Leaving needs to be a little more decisive than entering (24px above the lip, or
+  // standing on the surface), so a hop on the top rung doesn't make the frame bob.
+  const pcx = player.x + player.w / 2, feet = player.y + player.h;
+  const inside = pcx > RAVINE.x0 && pcx < RAVINE.x1;
+  if (inside && feet > RAVINE.lipY + 1) cam.inRavine = true;
+  else if (!inside || feet < RAVINE.lipY - 24 || (player.grounded && feet <= RAVINE.lipY)) cam.inRavine = false;
+  cam.dive = clamp(cam.dive + (cam.inRavine ? STEP : -STEP) / RAVINE.panTime, 0, 1);
+  const k = cam.dive * cam.dive * (3 - 2 * cam.dive);   // smoothstep; exactly 0 on the surface
+
+  const surfX = clamp(cam.fx - VIEW_W / 2, 0, ROOM_W - VIEW_W);
+  const surfY = clamp(cam.fy - VIEW_H / 2, 0, SURFACE_H - VIEW_H);
+  const targetX = surfX + (RAVINE.camX - surfX) * k;
+  const targetY = surfY + (ROOM_H - VIEW_H - surfY) * k;
+  cam.x += (targetX - cam.x) * T.camLerp;
+  cam.y += (targetY - cam.y) * T.camLerp;
+  // clamp again so lerp overshoot can never show outside the room
+  cam.x = clamp(cam.x, 0, ROOM_W - VIEW_W);
+  cam.y = clamp(cam.y, 0, ROOM_H - VIEW_H);
+}
+
+// ============================================================================
+// THEME — Ori-inspired luminous forest. All procedural, zero assets.
+// Visual only; TUNING stays feel-only.
+// ============================================================================
+const THEME = {
+  // Autumn Dusk — the ArtStation storybook reference, graded toward the posters in v0.2:
+  // deep indigo overhead and a warm band low down where the sun has just set behind the
+  // hills, with the glow sitting in the valley rather than up in a corner.
+  sky: [[0, "#1d2252"], [0.30, "#33305f"], [0.46, "#55406c"], [0.56, "#80506d"],
+        [0.63, "#b56664"], [0.69, "#df8a58"], [0.74, "#f0a45e"], [1, "#f3b46a"]],
+  sunPos: [260, 212], sunR: 230, sunColor: "255,176,96", sunA: 0.38,
+  // the farthest range: pale and warm, half lost in the glow
+  back: { top: "#76526c", bot: "#5c4565", baseY: 198, amp: 12, seed: 303, treeN: 0 },
+  // cottageX 471 is a crest of this range that is on screen from the first frame
+  far: { top: "#5b4a63", bot: "#463a52", baseY: 200, amp: 26, seed: 101, treeN: 8,
+         tree: { trunk: "#3a2f42", leafHi: "#b0684a", leafLo: "#6e4340" }, cottageX: 471 },
+  mid: { top: "#413650", bot: "#2e2740", baseY: 268, amp: 22, seed: 202, treeN: 6,
+         tree: { trunk: "#241d30", leafHi: "#a85638", leafLo: "#59352f" } },
+  cottageBody: "#4b3d5a", cottageRoof: "#3b3049",   // the far cottage, seen through haze
+  windowLit: "#ffd98a", windowGlow: "rgba(255,200,120,0.5)",
+  earthTop: "#463a52", earthBot: "#2b2338", earthSpeck: "#59462e",
+  grass: "#c08a4a", grassGlow: "#eec584", accent: "#c9563f",
+  rim: "#54455e", underShade: "#1a1526",
+  hollow: "#120e1c",        // rock behind the roofed parts of the ravine
+  leafColors: ["#c9803f", "#a85638", "#d9a05a"],
+  leafCount: 80,
+  mist: { y: 240, a: 0.10, tint: "#c9a08a" },
+  gradeTop: "rgba(40,40,90,0.10)", gradeBot: "rgba(180,120,80,0.08)",
+  vignette: 0.34,
+  face: {           // state-based expressions (visual only)
+    ouchFall: 0.45, // s of continuous falling that earns a >_< landing
+    ouchShow: 0.5,  // s the >_< face lingers
+    happyAfter: 4,  // s of standing still before ^_^
+    blinkLen: 0.12, // s a blink lasts
+  },
+};
+
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeCanvas(w, h) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+
+// --- home cottage + vista bench (playfield landmarks, design px) ---
+const HOME = {
+  x: 1616, w: 64, groundY: 384, doorX: 1648, eaveY: 338,
+  win: { x: 1622, y: 350, w: 12, h: 12 },
+  chimX: 1665, chimY: 308,                 // top of the chimney, where the smoke starts
+};
+const BENCH = { x0: 1372, x1: 1398, feetY: 272, cx: 1385 }; // stump on the vista perch
+
+// --- falling leaves — visual only, room-space ---
+const leaves = [];
+{
+  const rnd = mulberry32(777);
+  for (let i = 0; i < THEME.leafCount; i++) leaves.push({
+    x: rnd() * ROOM_W, y: rnd() * SURFACE_H,
+    vy: 8 + rnd() * 14, ph: rnd() * 6.28, sp: 0.5 + rnd(),
+    rot: rnd() * 6.28, rotSp: (rnd() - 0.5) * 2,
+    a: 0.55 + rnd() * 0.4,
+    col: THEME.leafColors[(rnd() * THEME.leafColors.length) | 0],
+  });
+}
+function updateLeaves(dt) {
+  for (const m of leaves) {
+    m.ph += m.sp * dt;
+    m.rot += m.rotSp * dt;
+    m.x += Math.sin(m.ph) * 12 * dt;
+    m.y += m.vy * dt;
+    // Leaves fall through the surface band. Below it only the ones over the open gorge
+    // keep going, so they drift down the gap instead of across solid rock.
+    const bottom = (m.x > RAVINE.gorgeX0 && m.x < RAVINE.gorgeX1) ? RAVINE.floorY : SURFACE_H;
+    if (m.y > bottom + 8) { m.y = -8; m.x = Math.random() * ROOM_W; }
+    if (m.x < -8) m.x += ROOM_W;
+    if (m.x > ROOM_W + 8) m.x -= ROOM_W;
+  }
+}
+
+// ============================================================================
+// Wisps — gentle collectibles that orbit Clawd and follow him home.
+// idle (bobbing in place) -> orbit (collected) -> fly -> lantern (at the eave).
+// ============================================================================
+const WISP_SPOTS = [           // design px centers; 11-12 live on the secret ledge, 13-15 down the ravine
+  [200, 368], [136, 323], [256, 291], [349, 344],
+  [624, 275], [712, 320], [765, 357], [1016, 307],
+  [1128, 352], [1408, 253],
+  [336, 240], [365, 243],
+  [1128, 424], [1032, 488], [952, 440],
+];
+const wisps = WISP_SPOTS.map(([x, y], i) => ({
+  x, y, hx: x, hy: y, state: "idle", i, t: Math.random() * 6.28,
+  tx: 0, ty: 0, fx: 0, fy: 0, ft: 0, delay: 0,
+}));
+let wispCount = 0;
+
+function updateWisps(dt) {
+  const pcx = player.x + player.w / 2, pcy = player.y + player.h / 2 - 2;
+  for (const w of wisps) {
+    w.t += dt;
+    if (w.state === "idle") {
+      w.x = w.hx + Math.sin(w.t * 1.3) * 3;
+      w.y = w.hy + Math.sin(w.t * 2.1) * 4;
+      const dx = w.x - pcx, dy = w.y - pcy;
+      if (game.state !== "title" && dx * dx + dy * dy < 15 * 15) {
+        w.state = "orbit";
+        wispCount++;
+        sndChime(wispCount);
+      }
+    } else if (w.state === "orbit") {
+      const ang = w.t * 1.6 + w.i * 2.4;
+      const r = 13 + (w.i % 3) * 4;
+      w.x += (pcx + Math.cos(ang) * r - w.x) * Math.min(1, dt * 6);
+      w.y += (pcy + Math.sin(ang) * r * 0.6 - 6 - w.y) * Math.min(1, dt * 6);
+    } else if (w.state === "fly") {
+      w.delay -= dt;
+      if (w.delay <= 0) {
+        w.ft = Math.min(1, w.ft + dt / 1.4);
+        const e = 1 - Math.pow(1 - w.ft, 3);
+        w.x = w.fx + (w.tx - w.fx) * e;
+        w.y = w.fy + (w.ty - w.fy) * e - Math.sin(e * Math.PI) * 24;
+        if (w.ft >= 1) w.state = "lantern";
+      }
+    } else {                    // lantern: settled at the cottage eave
+      w.x = w.tx + Math.sin(w.t * 1.2 + w.i) * 1.5;
+      w.y = w.ty + Math.sin(w.t * 1.7 + w.i) * 1.5;
+    }
+  }
+}
+
+// ============================================================================
+// Particles — dust puffs, grass flecks. Visual only, room-space.
+// ============================================================================
+const parts = [];
+function spawnPart(x, y, vx, vy, life, size, col, a) {
+  if (parts.length < 200) parts.push({ x, y, vx, vy, life, tot: life, size, col, a });
+}
+function updateParts(dt) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.life -= dt;
+    if (p.life <= 0) { parts.splice(i, 1); continue; }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 130 * dt;
+  }
+}
+
+// ============================================================================
+// Rendering — WebGL2 PROTOTYPE. Everything above this section is v0.3's game, unchanged
+// (`node tools/verify.js <this file> --baseline index.html` proves the walk plays the
+// same). This section replaces v0.3's Canvas 2D drawing. The world is drawn by WebGL2 with
+// inline GLSL into a high-dynamic-range buffer, lit by the wisps and Clawd's glow, then
+// bloomed, tone mapped and graded. The text (title, hints, cards) is still v0.3's Canvas
+// 2D code, drawn on a transparent canvas on top.
+//
+// One frame, back to front:
+//   bg      sky, drifting clouds, stars, three ranges of hills with swaying trees, the far
+//           cottage and its smoke, mist. At half resolution: it's all soft, and the
+//           softness reads as depth of field behind the sharp playfield.
+//   light   what the wisps and Clawd's glow put on each point of the playfield. The terrain
+//           blocks it: light sinks a few px into the earth and dies, so edges facing a
+//           light catch it and the earth behind them stays dark.
+//   world   the terrain, drawn from a distance field of LEVEL: turf, earth, pebbles, roots,
+//           lit by the sky, the glow behind the hills and the light buffer. Open air shows
+//           bg, plus a faint glow where light passes through the dusk.
+//   grass   ~3,100 blades on every top edge, swaying in gusts and pushed aside by Clawd.
+//   Clawd   pixel art built every frame from what he's doing, lit per pixel.
+//   sprites wisps, their trails and sparks, leaves, dust, fireflies, motes.
+//   fg      big out-of-focus leaves in the bottom corners, like the posters.
+//   post    bloom, then highlights rolled off, a grade, vignette and grain.
+// ============================================================================
+const screen = document.getElementById("screen");    // WebGL2: the world
+const hudCv = document.getElementById("hud");         // Canvas 2D on top: the text
+const sctx = hudCv.getContext("2d");                  // v0.3's HUD code draws here
+const CAPTURE = !!window.__capture;                   // set by the recorder, so it can read frames back
+const gl = screen.getContext("webgl2", {
+  alpha: false, antialias: false, depth: false, stencil: false,
+  premultipliedAlpha: false, preserveDrawingBuffer: CAPTURE, powerPreference: "high-performance",
+});
+if (!gl) document.body.insertAdjacentHTML("beforeend", '<div style="position:fixed;inset:0;z-index:20;display:flex;' +
+  'align-items:center;justify-content:center;color:#ffe9c4;background:#1a1526;font:16px system-ui">' +
+  "This prototype needs WebGL2, which this browser doesn't offer.</div>");
+
+// Quality. Phones (and ?q=low) get a smaller light buffer, softer sky and fewer bloom levels.
+const QS = String(location.search || "");
+const LOWQ = /[?&]q=low\b/.test(QS) || (isTouch && !/[?&]q=high\b/.test(QS));
+const QUAL = {
+  maxS: LOWQ ? 2.5 : 4,     // the HDR scene is drawn at up to this many px per design px, then scaled
+  bg: LOWQ ? 0.34 : 0.5,    // sky and hills, as a fraction of the scene's resolution
+  light: LOWQ ? 0.5 : 1,    // light buffer px per design px
+  bloom: LOWQ ? 4 : 6,      // bloom levels
+};
+
+let S = 1, offX = 0, offY = 0, dpr = 1;   // design -> device px, letterbox offset (the HUD uses these)
+let SR = 1, VW = 1, VH = 1;               // the scene buffer: SR px per design px, VW x VH px
+let outW = 1, outH = 1, outX = 0, outY = 0;
+
+// ---------------------------------------------------------------------------
+// Colour helpers: palette entries are written as hex, like THEME. The shaders work in
+// linear light, so hex is converted on the way in, and the result is written into the
+// GLSL source as a literal.
+// ---------------------------------------------------------------------------
+const hexRGB = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+const toLinear = (h) => hexRGB(h).map((v) => Math.pow(v, 2.2));
+const GV = (a) => "vec3(" + a.map((v) => v.toFixed(4)).join(",") + ")";
+const LIN = (h) => GV(toLinear(h));      // linear vec3 literal
+const SRGB = (h) => GV(hexRGB(h));       // sRGB vec3 literal (for gradients mixed like a canvas's)
+
+const MAXL = 24;                          // lights per frame
+const LAYER_W = VIEW_W * 2;               // the hill ranges repeat every 1024 px, as in v0.3
+
+// ---------------------------------------------------------------------------
+// GLSL
+// ---------------------------------------------------------------------------
+const GLSL_HEAD = "#version 300 es\nprecision highp float;\nprecision highp int;\n";
+const SH_COMMON = `
+uniform vec2 uCam;          // camera, design px
+uniform float uTime, uDusk; // seconds; 0 at the start of the walk, 1 at the cottage
+const vec2 VIEW = vec2(${VIEW_W}., ${VIEW_H}.);
+const vec3 SKY_AMB = vec3(.50, .48, .66);   // light from the dusk sky, on a surface open to it
+const vec3 RIM = ${LIN("#ffb27a")};          // the glow behind the hills, catching edges
+const vec3 NIGHT = ${LIN("#100d2a")};
+float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float hash11(float p) { p = fract(p * .1031); p *= p + 33.33; p *= p + p; return fract(p); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p), u = f * f * (3. - 2. * f);
+  return mix(mix(hash12(i), hash12(i + vec2(1., 0.)), u.x), mix(hash12(i + vec2(0., 1.)), hash12(i + vec2(1., 1.)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float s = 0., a = .5;
+  for (int i = 0; i < 4; i++) { s += a * vnoise(p); p = p * 2.03 + vec2(17.1, 9.7); a *= .5; }
+  return s;
+}
+vec3 toLin(vec3 c) { return pow(max(c, 0.), vec3(2.2)); }
+// how much of the glow where the sun went down reaches a point on screen
+float sunAt(vec2 s) { vec2 d = (s - vec2(260., 206.)) / vec2(250., 115.); return exp(-dot(d, d) * 2.); }
+// the breeze: a slow swell, a faster flutter, and a gust that rolls across left to right
+// every 11 s or so (quick to arrive, slow to die)
+float wind(float x, float t) {
+  float w = sin(x * .031 + t * 1.1) * .55 + sin(x * .083 - t * 1.9) * .25 + sin(x * .21 + t * 3.3) * .1;
+  float g = fract(t * .09 - x * .0019);
+  return w + smoothstep(0., .06, g) * smoothstep(.45, .06, g) * 1.6;
+}
+`;
+
+const SH_FULL_VS = `
+layout(location = 0) in vec2 aPos;
+out vec2 vUv;
+void main() { vUv = aPos * .5 + .5; gl_Position = vec4(aPos, 0., 1.); }
+`;
+
+// ---- 1. the sky and the hills ----------------------------------------------
+const SH_BG = SH_COMMON + `
+uniform vec3 uPhB, uPhF, uPhM;   // phases of each range's three sines (v0.3's seeds)
+uniform vec4 uTF[8], uTM[6];     // trees, far and mid range: x, ground y, size, trunk width (layer px)
+uniform vec4 uCF[48], uCM[36];   // their canopy circles: x, y, r
+uniform vec2 uHome;              // the far cottage's foot, layer px
+uniform float uHomeA;            // its fade (it hands over to the real one near the end)
+in vec2 vUv;
+out vec4 o;
+
+float ridge(float xl, float base, float amp, vec3 ph) {
+  float a = xl * ${(2 * Math.PI / LAYER_W).toFixed(9)};
+  return base + sin(a + ph.x) * amp + sin(a * 3. + ph.y) * amp * .4 + sin(a * 7. + ph.z) * amp * .15;
+}
+// v0.3's sky stops, mixed in sRGB as a canvas gradient mixes them
+vec3 skyRamp(float y) {
+  vec3 c = mix(${SRGB("#1d2252")}, ${SRGB("#33305f")}, clamp(y / .30, 0., 1.));
+  c = mix(c, ${SRGB("#55406c")}, clamp((y - .30) / .16, 0., 1.));
+  c = mix(c, ${SRGB("#80506d")}, clamp((y - .46) / .10, 0., 1.));
+  c = mix(c, ${SRGB("#b56664")}, clamp((y - .56) / .07, 0., 1.));
+  c = mix(c, ${SRGB("#df8a58")}, clamp((y - .63) / .06, 0., 1.));
+  c = mix(c, ${SRGB("#f0a45e")}, clamp((y - .69) / .05, 0., 1.));
+  return mix(c, ${SRGB("#f3b46a")}, clamp((y - .74) / .26, 0., 1.));
+}
+float cloudAt(vec2 s) {
+  vec2 p = vec2(s.x + uCam.x * .03 + uTime * 3., s.y);
+  float band = smoothstep(46., 92., s.y) * smoothstep(196., 146., s.y);
+  float n = fbm(vec2(p.x * .0085, p.y * .048)) + .42 * fbm(vec2(p.x * .026, p.y * .1) + 4.7);
+  return smoothstep(.74, 1.06, n) * band;
+}
+// one canopy circle of a tree, v0.3's radial gradient plus leafy clumps and a lit top edge
+void canopy(inout vec3 col, vec2 q, vec2 s, vec4 c, vec2 off, vec3 hi, vec3 lo, float id) {
+  vec2 cc = c.xy + off, dv = q - cc;
+  float d = length(dv);
+  if (d > c.z * 1.2 + 1.) return;
+  float ang = atan(dv.y, dv.x);
+  float rr = c.z * (1. + .09 * sin(ang * 7. + id * 3.1) + .05 * sin(ang * 12. + id * 1.7));   // leafy, scalloped edge
+  float cov = smoothstep(rr + .7, rr - .7, d);
+  if (cov <= 0.) return;
+  // v0.3's light from the upper left of each clump, broken into a few painted tones
+  float t = clamp((length(dv - vec2(-.3, -.4) * c.z) - .15 * c.z) / (c.z * 1.1), 0., 1.);
+  t = clamp(t + (vnoise(q * .17 + id * 5.7) - .5) * .45, 0., 1.);
+  t = mix(t, floor(t * 3. + .5) / 3., .7);
+  vec3 cs = toLin(mix(hi, lo, t)) * .9;
+  float rim = smoothstep(rr - 2., rr - .2, d) * smoothstep(.3, -.7, dv.y / c.z);
+  col = mix(col, cs + RIM * rim * (.1 + .9 * sunAt(s)), cov);
+}
+void main() {
+  vec2 s = vec2(vUv.x, 1. - vUv.y) * VIEW;
+  float lift = max(0., 144. - uCam.y);   // the camera rises on the high ledges: far things move less
+
+  // ---- sky ----
+  vec3 sk = skyRamp(s.y / VIEW.y);
+  vec2 sd = (s - vec2(260., 212.)) / vec2(230., 103.5);
+  sk = mix(sk, vec3(1., .69, .376), .38 * clamp(1. - length(sd), 0., 1.));   // v0.3's sun glow
+  vec3 col = toLin(sk);
+  // the last of the sun, hot right on the horizon (this is what blooms)
+  col += ${LIN("#ffb066")} * .38 * exp(-pow((s.y - 196.) / 20., 2.)) * exp(-pow((s.x - 262.) / 150., 2.));
+  // stars: a few at the top from the start, more as the dusk deepens
+  vec2 g = floor(s / 3.);
+  float h = hash12(g + 7.1);
+  float clouds = cloudAt(s);
+  if (h > .978 && s.y < 165.) {
+    vec2 c = (g + .5 + (vec2(hash12(g + 1.3), hash12(g + 2.9)) - .5) * 1.6) * 3.;
+    float tw = .55 + .45 * sin(uTime * (1.3 + h * 5.) + h * 40.);
+    float st = smoothstep(1., 0., length(s - c)) * tw * (.12 + .88 * uDusk) * smoothstep(165., 40., s.y);
+    col += vec3(.95, .9, 1.) * st * 1.3 * (1. - clouds);
+  }
+  // clouds: long streaks in the warm band, lit from below by the glow
+  if (clouds > 0.) {
+    float under = clamp((cloudAt(s - vec2(0., 2.5)) - cloudAt(s + vec2(0., 2.5))) * 2.2, 0., 1.);
+    vec3 cb = mix(${LIN("#3a3363")}, ${LIN("#8a5470")}, smoothstep(70., 185., s.y));
+    vec3 cl = ${LIN("#ffa070")} * (.25 + 1.1 * sunAt(s));
+    col = mix(col, cb + cl * (.25 + .75 * under), clouds * .8);
+  }
+
+  // ---- the back range: pale and warm, half lost in the glow, a treeline along its crest ----
+  {
+    float f = .12, xl = mod(s.x + uCam.x * f, 1024.), y = s.y - lift * f;
+    float top = ridge(xl, 198., 12., uPhB) - smoothstep(.5, .75, vnoise(vec2(xl * .09, 1.))) * (1.2 + 2.2 * vnoise(vec2(xl * .55, 5.)));
+    float a = smoothstep(-.7, .7, y - top);
+    if (a > 0.) {
+      vec3 c = mix(${SRGB("#76526c")}, ${SRGB("#5c4565")}, clamp((y - 166.) / 122., 0., 1.));
+      float hz = y < 198. ? .30 * clamp((y - 150.) / 48., 0., 1.) : mix(.30, .18, clamp((y - 198.) / 90., 0., 1.));
+      c = mix(c, mix(vec3(.91, .55, .38), vec3(.59, .35, .47), clamp((y - 198.) / 90., 0., 1.)), hz);   // v0.3's haze
+      vec3 lc = toLin(c) * (.92 + .16 * vnoise(vec2(xl * .05, y * .1)));
+      lc += RIM * exp(-(y - top) / 1.1) * (.2 + 1.1 * sunAt(s));
+      col = mix(col, lc, a);
+    }
+  }
+  // ---- the far range, its trees, and home on its crest ----
+  {
+    float f = .25, xl = mod(s.x + uCam.x * f, 1024.), y = s.y - lift * f;
+    vec2 q = vec2(xl, y);
+    float top = ridge(xl, 200., 26., uPhF);
+    float a = smoothstep(-.7, .7, y - top);
+    if (a > 0.) {
+      vec3 c = mix(${SRGB("#5b4a63")}, ${SRGB("#463a52")}, clamp((y - 154.) / 134., 0., 1.));
+      vec3 lc = toLin(c) * (.9 + .2 * vnoise(vec2(xl * .07, y * .12)));
+      lc = mix(lc, ${LIN("#c9876a")}, .16 * smoothstep(240., 190., y));   // haze
+      lc += RIM * exp(-(y - top) / 1.0) * (.15 + 1.0 * sunAt(s));
+      col = mix(col, lc, a);
+    }
+    for (int i = 0; i < 8; i++) {
+      vec4 t = uTF[i];
+      float dx = xl - t.x; dx -= 1024. * floor(dx / 1024. + .5);
+      if (abs(dx) > t.z * 1.5 + 2. || y < t.y - t.z * 3.3 || y > t.y + 1.) continue;
+      vec2 lq = vec2(t.x + dx, y);
+      if (abs(dx) < t.w * .5 && y > t.y - t.z * 1.5) col = mix(col, ${LIN("#3a2f42")}, .9);
+      float sw = sin(uTime * .8 + float(i) * 1.9) * .3 * t.z / 16.;
+      for (int k = 0; k < 6; k++) {
+        vec4 c = uCF[i * 6 + k];
+        canopy(col, lq, s, c, vec2(sw * clamp((t.y - c.y) / (t.z * 2.4), 0., 1.), 0.),
+               ${SRGB("#b0684a")}, ${SRGB("#6e4340")}, float(i * 6 + k));
+      }
+    }
+    // the cottage (not wrapped: it stands at one place on the walk, like v0.3's)
+    if (uHomeA > 0.) {
+      vec2 hq = vec2(s.x + uCam.x * f, y) - uHome;
+      vec3 c = col; float ca = 0.;
+      if (abs(hq.x) < 10. && hq.y > -16. && hq.y < 0.) { c = ${LIN("#4b3d5a")}; ca = 1.; }
+      if (hq.y > -27. && hq.y < -15. && abs(hq.x) < 13. * (hq.y + 27.) / 12.) { c = ${LIN("#3b3049")}; ca = 1.; }
+      if (hq.x > 3.6 && hq.x < 6.4 && hq.y > -25.6 && hq.y < -17.6) { c = ${LIN("#3b3049")}; ca = 1.; }
+      if (ca > 0. && hq.y < -15.5 && hq.y > -27.) c += RIM * .5 * smoothstep(1.5, 0., abs(hq.y + 27. - abs(hq.x) * 12. / 13.)) * sunAt(s);
+      // fence posts and rail either side, and two little trees like the posters
+      for (int k = 0; k < 8; k++) {
+        float px = (k < 4 ? -15. - float(k) * 4. : 15. + float(k - 4) * 4.);
+        float gy = ridge(mod(uHome.x + px, 1024.), 200., 26., uPhF) + 4. - uHome.y;
+        if (abs(hq.x - px) < .45 && hq.y > gy - 4. && hq.y < gy) { c = ${LIN("#2c2338")}; ca = 1.; }
+        if (abs(hq.x - px) < 2.1 && abs(hq.y - (gy - 2.6)) < .3) { c = ${LIN("#2c2338")}; ca = 1.; }
+      }
+      vec4 lt = vec4(-27.5, -1., 5.5, 0.), rt = vec4(27.5, 1., 6.5, 0.);
+      for (int k = 0; k < 2; k++) {
+        vec4 tr = k == 0 ? lt : rt;
+        float gy = ridge(mod(uHome.x + tr.x, 1024.), 200., 26., uPhF) + 5. - uHome.y;
+        if (abs(hq.x - tr.x) < .7 && hq.y > gy - 9. && hq.y < gy) { c = ${LIN("#2f2638")}; ca = 1.; }
+        vec2 cc = vec2(tr.x + sin(uTime * .9 + tr.y) * .3, gy - 9. - tr.z * .6);
+        float dd = length(hq - cc);
+        if (dd < tr.z) {
+          c = toLin(mix(${SRGB("#a0603f")}, ${SRGB("#5e3a3a")}, clamp(length(hq - cc + vec2(1., 1.5)) / tr.z, 0., 1.)));
+          c *= .8 + .4 * vnoise(hq * .9 + tr.y * 9.);
+          c += RIM * smoothstep(tr.z - 1.4, tr.z, dd) * step(hq.y, cc.y) * .9 * sunAt(s);
+          ca = 1.;
+        }
+      }
+      col = mix(col, c, ca * uHomeA);
+      // lit windows, with a flicker, and their halo (both bloom)
+      float fl = .9 + .1 * sin(uTime * 7.3) * sin(uTime * 3.1 + 1.);
+      vec2 w1 = hq - vec2(-5., -8.), w2 = hq - vec2(5., -8.);
+      float win = step(max(abs(w1.x), abs(w1.y)), 2.) + step(max(abs(w2.x), abs(w2.y)), 2.);
+      col += ${LIN("#ffd98a")} * 3.2 * fl * win * uHomeA;
+      col += ${LIN("#ffb860")} * .5 * fl * exp(-dot(hq - vec2(0., -8.), hq - vec2(0., -8.)) / 70.) * uHomeA;
+      // chimney smoke, v0.3's puffs
+      for (int i = 0; i < 8; i++) {
+        float p = fract(uTime * .18 + float(i) / 8.);
+        vec2 pc = vec2(5., -26.) + vec2(p * 16. + sin(p * 5. + float(i) * 1.7) * 2.2, -p * 34.) * .45;
+        float r = (2. + p * 6.5) * .45;
+        float pa = uHomeA * .2 * min(1., p * 5.) * (1. - p);
+        col = mix(col, ${LIN("#c4b6cc")} * (.6 + .8 * sunAt(s)), pa * smoothstep(r, r * .2, length(hq - pc)));
+      }
+    }
+  }
+  // ---- mist between the ranges, drifting ----
+  {
+    float f = .35, xm = s.x + uCam.x * f, y = s.y - lift * f;
+    float band = exp(-pow((y - 236.) / 17., 2.));
+    float n = fbm(vec2(xm * .011 + uTime * .025, y * .055 - uTime * .01));
+    col = mix(col, ${LIN("#c9a08a")} * (.55 + .9 * sunAt(s)), band * smoothstep(.38, .78, n) * .32);
+  }
+  // ---- the mid range: closer, darker, bigger trees that sway ----
+  {
+    float f = .5, xl = mod(s.x + uCam.x * f, 1024.), y = s.y - lift * f;
+    float top = ridge(xl, 268., 22., uPhM);
+    float a = smoothstep(-.7, .7, y - top);
+    if (a > 0.) {
+      vec3 lc = toLin(mix(${SRGB("#413650")}, ${SRGB("#2e2740")}, clamp((y - 226.) / 62., 0., 1.)));
+      lc *= .88 + .24 * fbm(vec2(xl * .05, y * .09));
+      lc += RIM * .8 * exp(-(y - top) / 1.0) * (.15 + .9 * sunAt(s));
+      col = mix(col, lc, a);
+    }
+    for (int i = 0; i < 6; i++) {
+      vec4 t = uTM[i];
+      float dx = xl - t.x; dx -= 1024. * floor(dx / 1024. + .5);
+      if (abs(dx) > t.z * 1.5 + 2. || y < t.y - t.z * 3.3 || y > t.y + 1.) continue;
+      vec2 lq = vec2(t.x + dx, y);
+      if (abs(dx) < t.w * .5 && y > t.y - t.z * 1.5) col = ${LIN("#241d30")};
+      float sw = sin(uTime * .9 + float(i) * 2.3) * .6 * t.z / 16. + wind(t.x * 4., uTime) * .25;
+      for (int k = 0; k < 6; k++) {
+        vec4 c = uCM[i * 6 + k];
+        canopy(col, lq, s, c, vec2(sw * clamp((t.y - c.y) / (t.z * 2.4), 0., 1.), 0.),
+               ${SRGB("#a85638")}, ${SRGB("#59352f")}, float(50 + i * 6 + k));
+      }
+    }
+  }
+  // the dusk deepening, as v0.3 lays it over everything
+  col = mix(col, NIGHT, .34 * uDusk);
+  o = vec4(col, 1.);
+}
+`;
+
+// ---- 2. the light buffer --------------------------------------------------
+const SH_LIGHT = SH_COMMON + `
+uniform sampler2D uSdf;
+uniform vec2 uRoom;
+uniform vec4 uL[${MAXL}];    // x, y, radius, height in front of the plane
+uniform vec4 uLc[${MAXL}];   // colour x intensity
+uniform int uN;
+in vec2 vUv;
+out vec4 o;
+float sd(vec2 p) { return texture(uSdf, p / uRoom).r; }
+void main() {
+  vec2 p = uCam + vec2(vUv.x, 1. - vUv.y) * VIEW;
+  float jit = hash12(floor(p * 2.) + .37);   // fixed to the world, so it doesn't crawl
+  vec3 sum = vec3(0.);
+  for (int i = 0; i < ${MAXL}; i++) {
+    if (i >= uN) break;
+    vec2 d = uL[i].xy - p;
+    float dist = length(d), r = uL[i].z;
+    if (dist >= r) continue;
+    float x = dist / r, f = 1. - x * x;
+    f = f * f / (1. + dist * dist * .0015);
+    // walk toward the light, adding up how much earth the ray goes through
+    float solid = 0.;
+    for (int k = 0; k < 12; k++) solid += clamp(.5 - sd(p + d * ((float(k) + jit) / 12.)), 0., 1.);
+    sum += uLc[i].rgb * f * exp(-solid * dist / 12. / 3.2);
+  }
+  o = vec4(sum, 1.);
+}
+`;
+
+// ---- 3. the terrain ------------------------------------------------------
+const SH_WORLD = SH_COMMON + `
+uniform sampler2D uBg, uLight, uSdf;
+uniform vec2 uRoom;
+uniform float uS;          // scene px per design px
+uniform float uScatter;    // how much the dusk air glows where light passes through it
+uniform vec4 uHomeP;       // the real cottage: x, ground y, width, window lit (0..1)
+uniform float uDoor;       // the doorway's glow as Clawd steps inside
+in vec2 vUv;
+out vec4 o;
+float sd(vec2 p) { return texture(uSdf, p / uRoom).r; }
+vec2 nrm(vec2 p) {         // toward the open air
+  vec2 g = vec2(sd(p + vec2(1., 0.)) - sd(p - vec2(1., 0.)), sd(p + vec2(0., 1.)) - sd(p - vec2(0., 1.)));
+  float l = length(g);
+  return l > 1e-4 ? g / l : vec2(0., -1.);
+}
+// The real cottage and the bench stump, as v0.3 bakes them, but lit. Returns colour and coverage.
+vec4 props(vec2 p, vec2 s, vec3 L) {
+  float hx = uHomeP.x, gy = uHomeP.y, hw = uHomeP.z, ey = gy - 46.;
+  vec3 c = vec3(0.); float a = 0.; vec3 emis = vec3(0.);
+  if (p.x > hx - 12. && p.x < hx + hw + 12. && p.y > gy - 86. && p.y < gy) {
+    if (p.x > hx && p.x < hx + hw && p.y > gy - 48.) {
+      c = mix(${LIN("#4a3e5c")}, ${LIN("#352b46")}, (p.y - gy + 48.) / 48.); a = 1.;
+      if (p.y < gy - 46.) c = ${LIN("#5a4c6e")};
+      c *= .85 + .3 * vnoise(vec2(p.x * .6, floor(p.y / 3.) * 2.1));            // boards
+    }
+    float apex = gy - 84., rh = (hw / 2. + 10.) * (p.y - apex) / (ey - apex);
+    if (p.y > apex && p.y < ey + 3. && abs(p.x - hx - hw / 2.) < (p.y < ey ? rh : hw / 2. + 10.)) {
+      c = mix(${LIN("#3d3252")}, ${LIN("#2a2138")}, (p.y - apex) / (ey - apex)); a = 1.;
+      c *= .85 + .25 * step(.5, fract((p.y - apex) / 4.));                        // shingle rows
+      c += RIM * .6 * smoothstep(2., 0., abs(p.y - apex - abs(p.x - hx - hw / 2.) * (ey - apex) / (hw / 2. + 10.))) * (.3 + sunAt(s));
+    }
+    if (p.x > hx + hw - 18. && p.x < hx + hw - 11. && p.y > gy - 76. && p.y < gy - 54.) { c = ${LIN("#2a2138")}; a = 1.; }
+    float dx = p.x - ${HOME.doorX}.;
+    float archTop = gy - 18. - 12. * (1. - pow(abs(dx) / 9., 2.));
+    if (abs(dx) < 9. && p.y > archTop && p.y < gy) {
+      c = ${LIN("#241d30")}; a = 1.;
+      emis += ${LIN("#ffbe6e")} * 2.2 * uDoor * smoothstep(9., 2., abs(dx));
+    }
+    vec2 w = p - vec2(${HOME.win.x + HOME.win.w / 2}., ${HOME.win.y + HOME.win.h / 2}.);
+    if (max(abs(w.x), abs(w.y)) < 8.) { c = ${LIN("#2c2438")}; a = 1.; }
+    if (max(abs(w.x), abs(w.y)) < 6.) {
+      c = ${LIN("#171224")};
+      float mullion = step(.5, abs(w.x)) * step(.5, abs(w.y));
+      emis += ${LIN("#ffd98a")} * 3. * uHomeP.w * mullion;
+    }
+    if (abs(p.x - ${HOME.doorX}.) < 12. && p.y > gy - 2.) { c = ${LIN("#3d3252")}; a = 1.; }
+  }
+  vec2 b = p - vec2(${BENCH.cx}., ${BENCH.feetY - 3.5});
+  vec2 bq = abs(b) - vec2(7., 1.5);
+  if (length(max(bq, 0.)) + min(max(bq.x, bq.y), 0.) < 2.) {
+    c = mix(${LIN("#5c4a55")}, ${LIN("#3a2f42")}, clamp((b.y + 3.5) / 7., 0., 1.)); a = 1.;
+    if (b.y < -1.5) c = mix(${LIN("#c08a4a")}, ${LIN("#eec584")}, step(b.y, -2.6));
+  }
+  if (a <= 0.) return vec4(0.);
+  vec3 lit = c * (SKY_AMB * .62 + L * 1.8);
+  lit = mix(lit, NIGHT, .34 * uDusk) + emis;
+  return vec4(lit, a);
+}
+vec3 terrain(vec2 p, float depth, vec2 s, vec3 L) {
+  vec2 n = nrm(p);
+  float up = clamp(-n.y, 0., 1.);
+  // what it's made of: earth that darkens with depth, mottled, with faint strata and pebbles
+  float m = fbm(p * vec2(.15, .21));
+  vec3 earth = mix(${LIN("#5a4a66")}, ${LIN("#3a2f48")}, smoothstep(1., 16., depth)) * (.72 + .56 * m);
+  earth *= .9 + .1 * sin(p.y * .8 + 6. * fbm(p * .035));
+  vec2 cell = floor(p / 6.), f = fract(p / 6.) - .5;
+  float ph = hash12(cell);
+  if (ph > .84 && depth > 4. && depth < 30.) {
+    float pd = length((f - (vec2(hash12(cell + 3.1), hash12(cell + 7.7)) - .5) * .35) * vec2(1., 1.4));
+    float pr = .17 + .1 * hash12(cell + 9.);
+    earth = mix(earth, ${LIN("#5d4c66")} * (.8 + .5 * (f.y < 0. ? 1. : .4)), smoothstep(pr, pr - .06, pd));
+  }
+  // turf on the tops: a grass band whose depth wobbles, streaked like blades
+  float turfD = 2.4 + 1.8 * vnoise(vec2(p.x * .4, 3.)) + .9 * vnoise(vec2(p.x * 1.6, 9.));
+  float turf = smoothstep(.45, .8, up) * smoothstep(turfD + .5, turfD - .5, depth);
+  vec3 grass = mix(${LIN("#6b4628")}, ${LIN("#c08a4a")}, smoothstep(turfD + .5, .2, depth));
+  grass *= .7 + .55 * vnoise(vec2(p.x * 2.3, p.y * .5));
+  // moss creeping down the sides just under a top corner
+  float side = smoothstep(.6, .9, abs(n.x)) * smoothstep(5., 1., depth);
+  float moss = side * smoothstep(.55, .3, vnoise(vec2(p.y * .35, p.x * .2))) * .7;
+  vec3 alb = mix(mix(earth, ${LIN("#5e5a34")}, moss), grass, turf);
+  // light: the sky (less of it deeper in), the warm glow catching edges, and the light buffer
+  float sky = exp(-depth / 7.);
+  vec3 amb = SKY_AMB * (.4 + .6 * sky) * (.6 + .4 * up) * (1. - .3 * uDusk);
+  // the glow behind the hills: a thin light on every edge, strongest on faces turned toward it
+  vec2 toSun = normalize(vec2(262., 200.) - s);
+  float face = pow(max(0., dot(n, toSun)), 1.5);
+  vec3 rim = RIM * exp(-depth / 1.4) * (.3 + .7 * up + 1.2 * face) * (.2 + 1.3 * sunAt(s));
+  vec3 base = mix(alb * (amb + rim), NIGHT, .34 * uDusk);
+  return base + alb * L * 2.4;
+}
+void main() {
+  vec2 s = vec2(vUv.x, 1. - vUv.y) * VIEW;
+  vec2 p = uCam + s;
+  vec3 L = texture(uLight, vUv).rgb;
+  vec3 col = texture(uBg, vUv).rgb;
+  // underground (the ravine) is a cave, not sky
+  float cave = smoothstep(410., 446., p.y);
+  if (cave > 0.) col = mix(col, ${LIN("#120e1c")} * (.55 + .7 * fbm(p * .07)), cave);
+  // the dusk air glows faintly where light passes through it
+  col += L * uScatter;
+  float d = sd(p);
+  // organic side faces: a little wobble, but none on tops, where Clawd's feet go
+  vec2 n0 = nrm(p);
+  if (d < 6. && d > -6.) d += (vnoise(vec2(p.y * .45, p.x * .1)) - .5) * 1.6 * smoothstep(.5, .9, abs(n0.x));
+  // roots and wisps of grass hanging under overhangs
+  if (d > 0. && d < 11. && n0.y > .75) {
+    float cx = floor(p.x * 1.5);
+    float h = hash11(cx * .37 + 11.);
+    if (h > .8) {
+      float len = 1.5 + 8. * hash11(cx * 1.3 + 2.) * hash11(cx * .71 + 5.);
+      float sw = sin(uTime * 1.2 + cx * .7) * .45 * (d / len);
+      float xr = (fract(p.x * 1.5) - .5) / 1.5 - sw;
+      float ra = smoothstep(.45, .1, abs(xr) * uS) * smoothstep(len, len - 1., d);
+      vec3 rc = (h > .93 ? ${LIN("#7a5a30")} : ${LIN("#3a2a35")}) * (SKY_AMB * .35 + L);
+      col = mix(col, rc, ra);
+    }
+  }
+  vec4 pr = props(p, s, L);
+  col = mix(col, pr.rgb, pr.a);
+  {                          // smoke from the real cottage's chimney, v0.3's puffs
+    vec2 hq = p - vec2(${HOME.chimX}., ${HOME.chimY}.);
+    if (hq.x > -8. && hq.x < 30. && hq.y > -46. && hq.y < 6.) {
+      for (int i = 0; i < 8; i++) {
+        float ph = fract(uTime * .18 + float(i) / 8.);
+        vec2 pc = vec2(ph * 16. + sin(ph * 5. + float(i) * 1.7) * 2.2, -ph * 34.);
+        float r = 2. + ph * 6.5, pa = .2 * min(1., ph * 5.) * (1. - ph);
+        col = mix(col, ${LIN("#c4b6cc")} * (SKY_AMB * .45 + L * .8 + .3 * sunAt(s)), pa * smoothstep(r, r * .2, length(hq - pc)));
+      }
+    }
+  }
+  float aa = .8 / uS;
+  float cov = smoothstep(aa, -aa, d);
+  if (cov > 0.) col = mix(col, terrain(p, max(-d, 0.), s, L), cov);
+  o = vec4(col, 1.);
+}
+`;
+
+// ---- 4. grass --------------------------------------------------------------
+const SH_GRASS_VS = SH_COMMON + `
+layout(location = 0) in vec4 aA;     // root x, root y, height, width (design px)
+layout(location = 1) in vec4 aB;     // lean (px at the tip), how much the wind moves it, shade, phase
+layout(location = 2) in float aBend; // pushed by Clawd and landings, px at the tip (sprung on the CPU)
+uniform float uS;
+out vec2 vW;
+out float vT, vE, vHalf, vShade;
+void main() {
+  float i = float(gl_VertexID);
+  float t = floor(i * .5) / 4.;
+  float side = mod(i, 2.) * 2. - 1.;
+  float h = aA.z, w = aA.w;
+  float sway = aB.x + wind(aA.x, uTime + aB.w * .15) * aB.y + aBend;
+  sway = clamp(sway, -h * .95, h * .95);
+  vec2 P2 = vec2(sway, -sqrt(max(h * h - sway * sway * .8, h * h * .12)));
+  vec2 P1 = vec2(0., P2.y * .55);
+  vec2 pos = 2. * (1. - t) * t * P1 + t * t * P2;
+  vec2 tg = 2. * (1. - t) * P1 + 2. * t * (P2 - P1);
+  vec2 nr = normalize(vec2(-tg.y, tg.x) + vec2(1e-5));
+  float hw = .5 * w * (1. - t * .88);
+  float pad = .8 / uS;
+  vec2 wp = aA.xy + pos + nr * side * (hw + pad);
+  vW = wp; vT = t; vShade = aB.z;
+  vE = side * (hw + pad) * uS;
+  vHalf = hw * uS;
+  vec2 sp = (wp - uCam) / VIEW;
+  gl_Position = vec4(sp.x * 2. - 1., 1. - sp.y * 2., 0., 1.);
+}
+`;
+const SH_GRASS_FS = SH_COMMON + `
+uniform sampler2D uLight;
+uniform vec2 uRes;
+in vec2 vW;
+in float vT, vE, vHalf, vShade;
+out vec4 o;
+void main() {
+  float a = clamp(vHalf + .5 - abs(vE), 0., 1.);
+  if (a <= .003) discard;
+  vec3 L = texture(uLight, gl_FragCoord.xy / uRes).rgb;
+  vec3 tip = mix(${LIN("#c08a4a")}, ${LIN("#eec584")}, vShade);
+  vec3 alb = mix(${LIN("#5a3a26")}, tip, smoothstep(0., .75, vT));
+  vec2 s = vW - uCam;
+  vec3 amb = SKY_AMB * (.3 + .7 * vT) * (1. - .3 * uDusk);
+  vec3 back = RIM * vT * vT * (.2 + 1.5 * sunAt(s));   // the glow coming through the tips
+  vec3 c = mix(alb * (amb + back), NIGHT, .34 * uDusk) + alb * L * (1.6 + 1.2 * vT);
+  o = vec4(c, a);
+}
+`;
+
+// ---- 5. Clawd ------------------------------------------------------------
+const SH_QUAD_VS = `
+uniform vec4 uRect;   // x, y, w, h in scene px (y down)
+uniform vec2 uRes;
+out vec2 vUv;
+void main() {
+  vec2 c = vec2(float(gl_VertexID & 1), float(gl_VertexID >> 1));
+  vUv = c;
+  vec2 px = uRect.xy + c * uRect.zw;
+  gl_Position = vec4(px.x / uRes.x * 2. - 1., 1. - px.y / uRes.y * 2., 0., 1.);
+}
+`;
+const SH_CLAWD = SH_COMMON + `
+uniform sampler2D uAlb, uNrm;
+uniform vec2 uFoot;              // world px of his feet (the grid's bottom middle)
+uniform vec2 uGrid;              // grid size, sprite px
+uniform float uAlpha;
+uniform vec4 uL[${MAXL}];
+uniform vec4 uLc[${MAXL}];
+uniform int uN;
+in vec2 vUv;
+out vec4 o;
+void main() {
+  vec4 a = texture(uAlb, vUv);
+  if (a.a < .5 || uAlpha <= 0.) discard;
+  vec4 nn = texture(uNrm, vUv);
+  vec3 N = normalize(vec3(nn.xy * 2. - 1., .85));
+  vec2 sp = floor(vUv * uGrid);
+  vec3 wp = vec3(uFoot + vec2(sp.x - uGrid.x * .5 + .5, sp.y - uGrid.y + .5), 0.);
+  vec3 alb = toLin(a.rgb);
+  vec2 s = wp.xy - uCam;
+  float legs = step(.6, nn.a) * step(nn.a, .8);
+  // a soft fill so he reads as his own colour, more from above, less underneath
+  float shade = .9 + .18 * max(0., -N.y) - .22 * legs - .12 * smoothstep(.5, 1., vUv.y);
+  vec3 lit = vec3(.96, .9, 1.) * shade * (1. - .25 * uDusk);
+  // the glow behind the hills catches the edges that face it
+  vec2 toSun = normalize(vec2(262., 200.) - s + vec2(0., -12.));
+  lit += RIM * pow(max(0., dot(N.xy, toSun)), 1.4) * nn.b * (.45 + 1.4 * sunAt(s));
+  vec3 base = mix(alb * lit, NIGHT, .22 * uDusk);
+  vec3 sum = vec3(0.);
+  for (int i = 0; i < ${MAXL}; i++) {
+    if (i >= uN) break;
+    vec3 d = vec3(uL[i].xy, uL[i].w) - wp;
+    float dist = length(d), r = uL[i].z * 1.1;
+    if (dist >= r) continue;
+    float x = dist / r, f = 1. - x * x;
+    f = f * f / (1. + dist * dist * .0015);
+    sum += uLc[i].rgb * f * (max(0., dot(N, d / dist)) * .9 + .25);
+  }
+  o = vec4(base + alb * sum * 2.0, uAlpha);
+}
+`;
+
+// ---- 6 & 7. sprites: wisps, sparks, leaves, dust, fireflies, the foreground ----
+const SH_SPR_VS = SH_COMMON + `
+layout(location = 0) in vec4 aP;   // centre x, y (world px), half width, half height
+layout(location = 1) in vec4 aC;   // colour (linear), alpha
+layout(location = 2) in vec4 aK;   // kind, rotation, aux, aux
+out vec2 vC, vS;
+out vec4 vCol, vK;
+void main() {
+  vec2 c = vec2(float(gl_VertexID & 1), float(gl_VertexID >> 1)) * 2. - 1.;
+  vC = c; vCol = aC; vK = aK;
+  float cs = cos(aK.y), sn = sin(aK.y);
+  vec2 l = c * aP.zw;
+  vec2 w = aP.xy + vec2(l.x * cs - l.y * sn, l.x * sn + l.y * cs);
+  vS = w - uCam;
+  vec2 sp = vS / VIEW;
+  gl_Position = vec4(sp.x * 2. - 1., 1. - sp.y * 2., 0., 1.);
+}
+`;
+const SH_SPR_FS = SH_COMMON + `
+uniform sampler2D uLight;
+uniform vec2 uRes;
+in vec2 vC, vS;
+in vec4 vCol, vK;
+out vec4 o;
+void main() {
+  float k = vK.x, r2 = dot(vC, vC);
+  vec3 L = texture(uLight, gl_FragCoord.xy / uRes).rgb;
+  if (k < .5) {                 // glow, added
+    o = vec4(vCol.rgb * vCol.a * exp(-r2 * 4.), 1.);
+  } else if (k < 1.5) {         // hot core, added
+    o = vec4(vCol.rgb * vCol.a * smoothstep(1., .3, sqrt(r2)), 1.);
+  } else if (k < 2.5) {         // the ring a wisp leaves when it's picked up, added
+    o = vec4(vCol.rgb * vCol.a * exp(-pow((sqrt(r2) - .8) / .1, 2.)), 1.);
+  } else if (k < 3.5) {         // a falling leaf, lit
+    float e = abs(vC.y) - (1. - vC.x * vC.x) * .95;
+    float a = clamp(.5 - e / max(fwidth(e), 1e-4), 0., 1.) * vCol.a;
+    if (a <= .003) discard;
+    vec3 lit = SKY_AMB * .55 * (1. - .3 * uDusk) + RIM * .55 * sunAt(vS) + L * 2.;
+    o = vec4(vCol.rgb * lit * (.85 + .3 * vC.x), a);
+  } else if (k < 4.5) {         // dust or a fleck of grass, lit
+    float a = smoothstep(1., .15, sqrt(r2)) * vCol.a;
+    if (a <= .003) discard;
+    o = vec4(vCol.rgb * (SKY_AMB * .6 + L * 2.), a);
+  } else if (k < 5.5) {         // contact shadow
+    o = vec4(vCol.rgb, smoothstep(1., 0., sqrt(r2)) * vCol.a);
+  } else if (k < 6.5) {         // a mote: only shows where there's light to catch, added
+    o = vec4(vCol.rgb * vCol.a * exp(-r2 * 3.) * (.015 + dot(L, vec3(.35, .45, .2)) * 1.4), 1.);
+  } else {                      // a big out-of-focus leaf in the foreground
+    float w = 1. - vC.x * vC.x;
+    float e = abs(vC.y + .12 * vC.x * vC.x) - w * .92;
+    float blur = vK.z;
+    float a = smoothstep(blur, -blur, e) * vCol.a;
+    if (a <= .003) discard;
+    float vein = smoothstep(.06 + blur * .3, 0., abs(vC.y + .12 * vC.x * vC.x)) * .25;
+    vec3 c = vCol.rgb * (1. + vein) * (.55 + .9 * sunAt(vS) + .2 * vK.w);
+    c += RIM * .35 * smoothstep(-blur * 2., blur, e) * (.3 + sunAt(vS));
+    o = vec4(c, a);
+  }
+}
+`;
+
+// ---- 8. bloom and the final image -------------------------------------------
+const SH_DOWN = `
+uniform sampler2D uSrc;
+uniform vec2 uTexel;
+uniform float uFirst, uThresh, uKnee;
+in vec2 vUv;
+out vec4 o;
+vec3 tp(vec2 d) { return texture(uSrc, vUv + d * uTexel).rgb; }
+void main() {   // 13 taps (Jimenez 2014), with a soft threshold on the first level
+  vec3 c = (tp(vec2(-1., -1.)) + tp(vec2(1., -1.)) + tp(vec2(-1., 1.)) + tp(vec2(1., 1.))) * .125
+    + (tp(vec2(-2., -2.)) + tp(vec2(2., -2.)) + tp(vec2(-2., 2.)) + tp(vec2(2., 2.))) * .03125
+    + (tp(vec2(0., -2.)) + tp(vec2(-2., 0.)) + tp(vec2(2., 0.)) + tp(vec2(0., 2.))) * .0625
+    + tp(vec2(0.)) * .125;
+  if (uFirst > .5) {
+    float br = max(c.r, max(c.g, c.b));
+    float soft = clamp(br - uThresh + uKnee, 0., 2. * uKnee);
+    soft = soft * soft / (4. * uKnee + 1e-4);
+    c *= max(soft, br - uThresh) / max(br, 1e-4);
+  }
+  o = vec4(c, 1.);
+}
+`;
+const SH_UP = `
+uniform sampler2D uSrc;
+uniform vec2 uTexel;
+in vec2 vUv;
+out vec4 o;
+void main() {   // 3x3 tent, added onto the level above
+  vec2 t = uTexel;
+  vec3 s = texture(uSrc, vUv + vec2(-t.x, -t.y)).rgb + texture(uSrc, vUv + vec2(t.x, -t.y)).rgb
+    + texture(uSrc, vUv + vec2(-t.x, t.y)).rgb + texture(uSrc, vUv + vec2(t.x, t.y)).rgb
+    + (texture(uSrc, vUv + vec2(0., -t.y)).rgb + texture(uSrc, vUv + vec2(0., t.y)).rgb
+    + texture(uSrc, vUv + vec2(-t.x, 0.)).rgb + texture(uSrc, vUv + vec2(t.x, 0.)).rgb) * 2.
+    + texture(uSrc, vUv).rgb * 4.;
+  o = vec4(s / 16., 1.);
+}
+`;
+const SH_FINAL = SH_COMMON + `
+uniform sampler2D uScene, uBloom;
+uniform float uBloomK, uExpo, uGrain;
+uniform vec2 uRes;
+in vec2 vUv;
+out vec4 o;
+vec3 rolloff(vec3 c) {   // the painted palette stays as painted below .62; above, highlights roll off to white
+  vec3 over = max(c - .62, 0.);
+  return min(c, vec3(.62)) + .38 * (1. - exp(-over / .38));
+}
+void main() {
+  vec3 c = texture(uScene, vUv).rgb + texture(uBloom, vUv).rgb * uBloomK;
+  c = rolloff(c * uExpo);
+  float l = dot(c, vec3(.2126, .7152, .0722));
+  c = mix(c, c * vec3(.86, .88, 1.14), (1. - smoothstep(0., .22, l)) * .35);   // shadows toward indigo
+  vec2 q = (vUv - .5) * vec2(1.15, 1.45);
+  c *= mix(vec3(.5, .52, .7), vec3(1.), clamp(1.25 - dot(q, q) * 1.1, 0., 1.)); // vignette
+  c = pow(max(c, 0.), vec3(1. / 2.2));
+  c += (hash12(vUv * uRes + fract(uTime * 7.31) * 113.) - .5) * uGrain;       // grain; also breaks up banding
+  o = vec4(c, 1.);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// GL plumbing
+// ---------------------------------------------------------------------------
+const G = { progs: {} };
+// Light brighter than white needs a float target. Most browsers allow one; some phones only
+// the half-float extension; without either, highlights clip at white and bloom has less to
+// work with, but everything still draws.
+const HDR = (gl && (gl.getExtension("EXT_color_buffer_float") || gl.getExtension("EXT_color_buffer_half_float")))
+  ? { i: gl.RGBA16F, f: gl.RGBA, t: gl.HALF_FLOAT } : { i: gl && gl.RGBA8, f: gl && gl.RGBA, t: gl && gl.UNSIGNED_BYTE };
+
+function glProgram(name, vs, fs) {
+  const sh = (type, src) => {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, GLSL_HEAD + src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(name + " shader: " + gl.getShaderInfoLog(s));
+    return s;
+  };
+  const p = gl.createProgram();
+  gl.attachShader(p, sh(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(name + " link: " + gl.getProgramInfoLog(p));
+  const u = {};
+  const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) {
+    const info = gl.getActiveUniform(p, i);
+    u[info.name.replace(/\[0\]$/, "")] = gl.getUniformLocation(p, info.name);
+  }
+  return { p, u };
+}
+function makeTex(w, h, internal, format, type, filter, data) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, internal, w, h, 0, format, type, data || null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+function makeRT(w, h) {
+  w = Math.max(1, w | 0); h = Math.max(1, h | 0);
+  const tex = makeTex(w, h, HDR.i, HDR.f, HDR.t, gl.LINEAR);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return { tex, fb, w, h };
+}
+function freeRT(rt) { if (rt) { gl.deleteTexture(rt.tex); gl.deleteFramebuffer(rt.fb); } }
+function useRT(rt) { gl.bindFramebuffer(gl.FRAMEBUFFER, rt.fb); gl.viewport(0, 0, rt.w, rt.h); }
+function bindTex(unit, t) { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); }
+function fullScreen() { gl.bindVertexArray(G.vaoFull); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+function useProg(name, w) {
+  const pr = G.progs[name];
+  gl.useProgram(pr.p);
+  const u = pr.u;
+  if (u.uCam) gl.uniform2f(u.uCam, w.camX, w.camY);
+  if (u.uTime) gl.uniform1f(u.uTime, w.time);
+  if (u.uDusk) gl.uniform1f(u.uDusk, w.dusk);
+  return u;
+}
+
+function glTargets() {
+  freeRT(G.scene); G.scene = makeRT(VW, VH);
+  freeRT(G.bg); G.bg = makeRT(Math.round(VW * QUAL.bg), Math.round(VH * QUAL.bg));
+  if (!G.light) G.light = makeRT(Math.round(VIEW_W * QUAL.light), Math.round(VIEW_H * QUAL.light));
+  for (const rt of G.bloom || []) freeRT(rt);
+  G.bloom = [];
+  let w = VW >> 1, h = VH >> 1;
+  for (let i = 0; i < QUAL.bloom && w >= 4 && h >= 4; i++) { G.bloom.push(makeRT(w, h)); w >>= 1; h >>= 1; }
+}
+
+// ---------------------------------------------------------------------------
+// The world as data the shaders can read
+// ---------------------------------------------------------------------------
+
+// A signed distance field of the terrain, one texel per design px: + in open air, - in
+// earth, in px. The physics never sees it: it's only for drawing, so it may round off the
+// corners a little (2 px) to stop the slabs looking cut from a grid.
+function edt(f, w, h) {   // squared Euclidean distance transform (Felzenszwalb & Huttenlocher)
+  const INF = 1e20, n = Math.max(w, h);
+  const g = new Float32Array(n), d = new Float32Array(n), z = new Float32Array(n + 1), v = new Int32Array(n);
+  const pass = (get, set, len) => {
+    for (let q = 0; q < len; q++) g[q] = get(q);
+    let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+    for (let q = 1; q < len; q++) {
+      let s;
+      while (true) {
+        const r = v[k];
+        s = ((g[q] + q * q) - (g[r] + r * r)) / (2 * q - 2 * r);
+        if (s <= z[k]) { k--; if (k < 0) { k = 0; break; } } else break;
+      }
+      k++; v[k] = q; z[k] = s; z[k + 1] = INF;
+    }
+    k = 0;
+    for (let q = 0; q < len; q++) { while (z[k + 1] < q) k++; const r = v[k]; d[q] = (q - r) * (q - r) + g[r]; }
+    for (let q = 0; q < len; q++) set(q, d[q]);
+  };
+  for (let x = 0; x < w; x++) pass((y) => f[y * w + x], (y, val) => { f[y * w + x] = val; }, h);
+  for (let y = 0; y < h; y++) pass((x) => f[y * w + x], (x, val) => { f[y * w + x] = val; }, w);
+  return f;
+}
+const SDF = (() => {
+  const w = ROOM_W, h = ROOM_H, N = w * h, INF = 1e20;
+  const solid = new Uint8Array(N);
+  for (let y = 0; y < h; y++) {
+    const row = LEVEL[(y / TILE) | 0];
+    for (let x = 0; x < w; x++) solid[y * w + x] = row[(x / TILE) | 0] === "#" ? 1 : 0;
+  }
+  const signed = (sol) => {
+    const toSolid = new Float32Array(N), toAir = new Float32Array(N);
+    for (let i = 0; i < N; i++) { toSolid[i] = sol[i] ? 0 : INF; toAir[i] = sol[i] ? INF : 0; }
+    edt(toSolid, w, h); edt(toAir, w, h);
+    const out = new Float32Array(N);
+    for (let i = 0; i < N; i++) out[i] = sol[i] ? 0.5 - Math.sqrt(toAir[i]) : Math.sqrt(toSolid[i]) - 0.5;
+    return out;
+  };
+  // round convex corners: shrink the earth by R, then grow it back by R
+  const R = 2;
+  const d0 = signed(solid);
+  const shrunk = new Uint8Array(N);
+  for (let i = 0; i < N; i++) shrunk[i] = d0[i] < -R ? 1 : 0;
+  const d1 = signed(shrunk);
+  for (let i = 0; i < N; i++) d1[i] = Math.max(-64, Math.min(64, d1[i] - R));
+  return d1;
+})();
+
+// The hill ranges, rebuilt from v0.3's seeds so the composition is the same.
+function rangeData(L) {
+  const rnd = mulberry32(L.seed);
+  const ph = [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28];
+  const yAt = (x) => L.baseY
+    + Math.sin((x / LAYER_W) * 2 * Math.PI + ph[0]) * L.amp
+    + Math.sin((x / LAYER_W) * 6 * Math.PI + ph[1]) * L.amp * 0.4
+    + Math.sin((x / LAYER_W) * 14 * Math.PI + ph[2]) * L.amp * 0.15;
+  const trees = new Float32Array(Math.max(1, L.treeN) * 4), circ = new Float32Array(Math.max(1, L.treeN) * 24);
+  for (let i = 0; i < L.treeN; i++) {
+    const tx = rnd() * LAYER_W, ty = yAt(tx) + 6, s = 10 + rnd() * 14;
+    trees.set([tx, ty, s, Math.max(2, s * 0.16)], i * 4);
+    const r2 = mulberry32(L.seed + i * 7), cy = ty - s * 1.6;
+    for (let k = 0; k < 6; k++) {
+      const ox = (r2() - 0.5) * s * 1.2, oy = -r2() * s * 0.7, r = s * (0.45 + r2() * 0.35);
+      circ.set([tx + ox, cy + oy, r, 0], (i * 6 + k) * 4);
+    }
+  }
+  return { ph, yAt, trees, circ };
+}
+const RANGES = { back: rangeData(THEME.back), far: rangeData(THEME.far), mid: rangeData(THEME.mid) };
+THEME.far.cottageY = RANGES.far.yAt(THEME.far.cottageX) + 4;
+// The far cottage hands over to the real one. Fully there until the camera passes 860,
+// gone by 1060, before the real cottage's roof enters the frame (at cam.x 1094).
+function farHomeAlpha(cx) {
+  const t = clamp((cx - 860) / 200, 0, 1);
+  return 1 - t * t * (3 - 2 * t);
+}
+
+// Grass: blades along every top edge of the earth, plus longer ones drooping over the ends
+// of ledges. Generated from fixed seeds, so it's the same every time.
+const GRASS = (() => {
+  const back = [], front = [];
+  const solid = (tx, ty) => ty >= 0 && ty < LEVEL.length && tx >= 0 && tx < LEVEL[0].length && LEVEL[ty][tx] === "#";
+  for (let ty = 0; ty < LEVEL.length; ty++) {
+    for (let tx = 0; tx < LEVEL[0].length; tx++) {
+      if (!solid(tx, ty) || solid(tx, ty - 1)) continue;
+      const r = mulberry32(tx * 7919 + ty * 104729 + 17);
+      const x0 = tx * TILE, y0 = ty * TILE;
+      const deep = y0 > SURFACE_H;                      // the ravine: sparser, shorter
+      const n = deep ? 6 : 19;
+      for (let i = 0; i < n; i++) {
+        const tall = r() < 0.08;
+        const h = (deep ? 2 : 2.6) + Math.pow(r(), 1.6) * (deep ? 4 : 7) + (tall ? 3 + r() * 4 : 0);
+        const blade = [x0 + r() * TILE, y0 + 0.6, h, 0.9 + r() * 0.6,
+          (r() - 0.5) * h * 0.5, 0.45 + r() * 0.7, r(), r() * 40];
+        if (!tall && h < 5 && r() < 0.25) { blade[1] += 0.6; blade[2] = Math.min(h, 2.2); front.push(blade); } else back.push(blade);
+      }
+      for (const side of [-1, 1]) {                     // drooping over a ledge's end
+        if (solid(tx + side, ty)) continue;
+        for (let i = 0; i < 4; i++) {
+          const h = 4 + r() * 5;
+          back.push([x0 + (side < 0 ? 0.5 + r() * 2.5 : TILE - 0.5 - r() * 2.5), y0 + 1, h, 0.9 + r() * 0.5,
+            side * h * (0.55 + r() * 0.4), 0.5 + r() * 0.5, r(), r() * 40]);
+        }
+      }
+    }
+  }
+  const pack = (list) => {
+    const a = new Float32Array(list.length * 8);
+    list.forEach((b, i) => a.set(b, i * 8));
+    return { data: a, n: list.length, bend: new Float32Array(list.length), vel: new Float32Array(list.length) };
+  };
+  return { back: pack(back), front: pack(front) };
+})();
+
+// Fireflies and motes: where each one is, is a function of time, so they cost no state.
+function surfaceY(x) {
+  const tx = clamp((x / TILE) | 0, 0, LEVEL[0].length - 1);
+  for (let ty = 0; ty < 27; ty++) if (LEVEL[ty][tx] === "#") return ty * TILE;
+  return SURFACE_H;
+}
+const FLIES = [], MOTES = [];
+{
+  const r = mulberry32(5150);
+  for (let i = 0; i < 64; i++) {
+    const x = r() * ROOM_W;
+    FLIES.push({ x, y: surfaceY(x) - 7 - r() * 30, ph: r() * 6.28, sp: 0.5 + r() * 0.8, bl: r() * 6.28, bs: 0.5 + r() * 0.9 });
+  }
+  for (let i = 0; i < 220; i++) MOTES.push({ x: r() * ROOM_W, y: 120 + r() * (SURFACE_H - 120), ph: r() * 6.28, s: 0.6 + r() * 0.8 });
+}
+// The foreground: big out-of-focus leaves in the bottom corners, as in the posters.
+// Placed in their own space, which moves 1.6x as fast as the playfield.
+const FG = [];
+{
+  const r = mulberry32(31337);
+  for (const [gx, side] of [[-14, 1], [522, -1], [1300, 1], [2038, 1], [2568, -1]]) {   // the start's corners, one passing, the end's corners
+    const n = 3 + ((r() * 2) | 0);
+    for (let i = 0; i < n; i++) {
+      // rot 0 points the tip right; lean each leaf up and in from its corner
+      const up = 0.35 + r() * 0.75;
+      FG.push({ x: gx + side * r() * 34, y: VIEW_H + 6 - r() * 14, len: 18 + r() * 20, wid: 7 + r() * 5,
+        rot: side > 0 ? -up : Math.PI + up, blur: 0.12 + r() * 0.2, shade: r(), ph: r() * 6.28,
+        col: [["#8c3f22", "#a8572c", "#6f3020", "#b5652f"][(r() * 4) | 0]] });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// GL setup
+// ---------------------------------------------------------------------------
+function glInit() {
+  G.progs.bg = glProgram("bg", SH_FULL_VS, SH_BG);
+  G.progs.light = glProgram("light", SH_FULL_VS, SH_LIGHT);
+  G.progs.world = glProgram("world", SH_FULL_VS, SH_WORLD);
+  G.progs.grass = glProgram("grass", SH_GRASS_VS, SH_GRASS_FS);
+  G.progs.clawd = glProgram("clawd", SH_QUAD_VS, SH_CLAWD);
+  G.progs.spr = glProgram("sprites", SH_SPR_VS, SH_SPR_FS);
+  G.progs.down = glProgram("bloom down", SH_FULL_VS, SH_DOWN);
+  G.progs.up = glProgram("bloom up", SH_FULL_VS, SH_UP);
+  G.progs.final = glProgram("final", SH_FULL_VS, SH_FINAL);
+
+  G.vaoFull = gl.createVertexArray();
+  gl.bindVertexArray(G.vaoFull);
+  const fb = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, fb);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  G.vaoEmpty = gl.createVertexArray();
+
+  G.sdf = makeTex(ROOM_W, ROOM_H, gl.R16F, gl.RED, gl.FLOAT, gl.LINEAR, SDF);
+
+  // grass: two instance sets, the blades behind Clawd and a few short ones in front of him
+  const grassVao = (set) => {
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const sb = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, sb);
+    gl.bufferData(gl.ARRAY_BUFFER, set.data, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 32, 0); gl.vertexAttribDivisor(0, 1);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(1, 1);
+    const bb = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, bb);
+    gl.bufferData(gl.ARRAY_BUFFER, set.bend, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 4, 0); gl.vertexAttribDivisor(2, 1);
+    set.vao = vao; set.bendBuf = bb;
+  };
+  grassVao(GRASS.back); grassVao(GRASS.front);
+
+  // sprites: one dynamic instance buffer, drawn in groups
+  G.sprVao = gl.createVertexArray();
+  gl.bindVertexArray(G.sprVao);
+  G.sprBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, G.sprBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, SPR.data.byteLength, gl.DYNAMIC_DRAW);
+  for (let a = 0; a < 3; a++) { gl.enableVertexAttribArray(a); gl.vertexAttribDivisor(a, 1); }
+
+  G.clawdAlb = makeTex(CW, CH, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.NEAREST, null);
+  G.clawdNrm = makeTex(CW, CH, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, gl.NEAREST, null);
+  gl.bindVertexArray(null);
+}
+
+// ---------------------------------------------------------------------------
+// Sprites, collected each frame into groups (each group is one draw)
+// ---------------------------------------------------------------------------
+const SPR = { data: new Float32Array(3000 * 12), n: 0, groups: {} };
+const SPR_KIND = { glow: 0, core: 1, ring: 2, leaf: 3, dust: 4, shadow: 5, mote: 6, fg: 7 };
+function sprBegin(name) { SPR.groups[name] = { start: SPR.n, n: 0 }; SPR.cur = SPR.groups[name]; }
+function spr(x, y, hw, hh, rgb, a, kind, rot, aux, aux2) {
+  if (SPR.n >= 3000) return;
+  SPR.data.set([x, y, hw, hh, rgb[0], rgb[1], rgb[2], a, kind, rot || 0, aux || 0, aux2 || 0], SPR.n * 12);
+  SPR.n++; SPR.cur.n++;
+}
+function drawGroup(name) {
+  const g = SPR.groups[name];
+  if (!g || !g.n) return;
+  gl.bindVertexArray(G.sprVao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, G.sprBuf);
+  const off = g.start * 48;
+  gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 48, off);
+  gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 48, off + 16);
+  gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 48, off + 32);
+  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, g.n);
+}
+// the breeze, the same as the shaders' wind()
+function wind(x, t) {
+  const w = Math.sin(x * 0.031 + t * 1.1) * 0.55 + Math.sin(x * 0.083 - t * 1.9) * 0.25 + Math.sin(x * 0.21 + t * 3.3) * 0.1;
+  const g = ((t * 0.09 - x * 0.0019) % 1 + 1) % 1;
+  const ss = (a, b, v) => { const k = clamp((v - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
+  return w + ss(0, 0.06, g) * ss(0.45, 0.06, g) * 1.6;
+}
+const linCache = {};
+const LC = (hex) => linCache[hex] || (linCache[hex] = toLinear(hex));
+const mulC = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+
+// ---------------------------------------------------------------------------
+// Clawd, built each frame. The grid is 24 x 18 sprite px; v0.3's 16 x 12 frame sits at
+// (4, 6) in it, with room around for arms flung up, legs splayed and a squash. Each
+// sprite px is one design px, drawn on whole screen pixels like v0.3.
+//
+// He's composed from parts, not picked from a flip-book: a body whose top and bottom
+// move, two arms that slide up and down his sides with how he's moving, four legs that
+// step one after another, and eyes that look where he's going or at the nearest wisp.
+// ---------------------------------------------------------------------------
+const CW = 24, CH = 18, CX0 = 4, CY0 = 6;
+const cgrid = new Uint8Array(CW * CH);          // 0 empty, 1 body, 2 arm, 3 leg, 4 eye
+const cAlb = new Uint8Array(CW * CH * 4), cNrm = new Uint8Array(CW * CH * 4);
+const anim = {
+  gait: 0, arm: 0, accel: 0, prevVx: 0, lean: 0, leanT: 0, breath: 0, tuck: 0,
+  look: null, lookT: 0, eyeX: 0, eyeY: 0, eyeHold: 0, swing: [false, false, false, false], stepCool: 0, jit: 0,
+};
+const CLAWD_COLS = { 1: [217, 119, 87], 2: [217, 119, 87], 3: [196, 103, 74], 4: [29, 19, 14] };
+function cput(x, y, v) {
+  x += CX0; y += CY0;
+  if (x >= 0 && x < CW && y >= 0 && y < CH && (v === 4 || cgrid[y * CW + x] !== 4)) cgrid[y * CW + x] = v;
+}
+
+function composeClawd(dt, expr) {
+  const P = player, A = anim, T = TUNING;
+  cgrid.fill(0);
+  const speed = Math.abs(P.vx);
+  const acc = (P.vx - A.prevVx) / Math.max(dt, 1e-4) * P.facing;
+  A.prevVx = P.vx;
+  A.accel += (acc - A.accel) * Math.min(1, dt * 10);
+  A.stepCool -= dt;
+
+  let top = 1, bot = 8, wide = 0, lean = 0, eyeDy = 0, eyeDx = null, armT = 0;
+  let armBack = 0, armFront = 0;                 // extra row offsets, per arm
+  const legs = [3, 6, 9, 12].map((c) => ({ c, dx: 0, len: 3, foot: 0 }));   // foot: 0 full, -1 trailing px, 2 none
+  let template = null;
+
+  if (P.clinging) {
+    template = BODY.cling[0].rows;               // v0.3's cling pose, eyes still procedural
+    eyeDx = 0; eyeDy = P.vy > 60 ? 1 : -1;
+    if (P.vy > 5) { A.jit += dt; if (A.jit > 0.16) A.jit = 0; }
+  } else if (!P.grounded) {
+    A.tuck = Math.max(0, A.tuck - dt);
+    if (P.jumpT < 0.06 && P.vy < 0) {            // the launch crouch (v0.3's anticipation frame)
+      top = 3; bot = 10; armT = 0;
+      legs.forEach((l, i) => { l.len = 1; l.dx = i === 0 ? -1 : i === 3 ? 1 : 0; });
+    } else if (A.tuck > 0) {                     // the double jump: legs pulled in, arms out
+      top = 1; bot = 8; armT = 0;
+      legs.forEach((l, i) => { l.len = 1; l.dx = i < 2 ? 1 : -1; });
+    } else if (P.vy < -T.apexPoseVy) {           // rising: stretched, arms swept down, legs trailing
+      top = 0; bot = 7; armT = 2; eyeDy = -1;
+      legs.forEach((l) => { l.len = 2; l.foot = -1; });
+    } else if (P.vy <= T.apexPoseVy) {           // the top: legs splayed
+      armT = 0;
+      legs.forEach((l, i) => { l.len = i === 0 || i === 3 ? 2 : 1; l.dx = i === 0 ? -1 : i === 3 ? 1 : 0; });
+    } else {                                     // falling: arms flung up, legs reaching, eyes down
+      armT = -2; eyeDy = 1;
+      if (P.vy > 230) top = 0;                   // falling fast: a pixel of stretch
+    }
+  } else {
+    A.tuck = 0;
+    const sq = fx.squashT > 0 && fx.squash > 0 ? Math.round((fx.squash > 0.14 ? 2 : 1) * Math.min(1, fx.squashT / 0.1)) : 0;
+    if (sq > 0) {                                // landing: squashed and spread, in whole pixels
+      top = 1 + sq; wide = 1; armT = 1;
+      legs.forEach((l, i) => { l.dx = i === 0 ? -1 : i === 3 ? 1 : 0; if (sq > 1) { l.len = 2; } });
+      if (sq > 1) { bot = 9; top = Math.max(top, 3); }
+    } else if (speed > 5) {                      // walking: the legs step in turn, front to back
+      A.gait += dt * (1.8 + speed / T.runMax * 2.9);
+      legs.forEach((l, i) => {
+        const u = (A.gait + (3 - i) * 0.25) % 1;
+        const swing = u < 0.3;
+        if (swing) { l.len = 2; l.dx = 1; }
+        if (A.swing[i] && !swing && A.stepCool <= 0) { sndStep(); A.stepCool = 0.08; }
+        A.swing[i] = swing;
+      });
+      const half = (A.gait * 2) % 1;
+      if (speed < 70 && half > 0.5) { top += 1; bot += 1; legs.forEach((l) => { l.len = Math.max(1, l.len - 1); }); }
+      armBack = (A.gait % 1) < 0.5 ? 0 : -1;
+      armFront = armBack ? 0 : -1;
+      eyeDx = 1;
+      if (A.accel > 350 || speed > T.runMax * 0.9) { A.lean = 1; A.leanT = 0.1; }
+    } else {                                     // standing: breathing, looking about
+      A.breath += dt;
+      if (A.breath % 2.6 > 1.75) { top += 1; bot += 1; legs.forEach((l) => { l.len = 2; }); }
+      A.swing.fill(false);
+    }
+    if (A.accel < -450 && speed > 25) { A.lean = -1; A.leanT = 0.12; }
+  }
+  A.leanT -= dt;
+  if (A.leanT <= 0) A.lean = 0;
+  lean = P.grounded ? A.lean : 0;
+  A.arm += (armT - A.arm) * Math.min(1, dt * 18);
+
+  // where the eyes look: ahead when moving, else the nearest wisp, else the far cottage
+  if (eyeDx === null) {
+    A.lookT -= dt;
+    if (A.lookT <= 0) {
+      const pcx = P.x + P.w / 2, pcy = P.y + P.h / 2;
+      let best = null, bd = 150 * 150;
+      for (const w of wisps) {
+        if (w.state === "lantern" || w.state === "fly") continue;
+        const dd = (w.x - pcx) ** 2 + (w.y - pcy) ** 2;
+        if (dd < bd && (w.state === "idle" || anim.vrnd() < 0.5)) { bd = dd; best = w; }
+      }
+      A.look = best; A.lookT = 0.9 + anim.vrnd() * 1.4;
+    }
+    let dx = 0, dy = 0;
+    if (A.look) { dx = (A.look.x - (P.x + P.w / 2)) * P.facing; dy = A.look.y - (P.y + P.h / 2); }
+    eyeDx = dx > 7 ? 1 : dx < -7 ? -1 : 0;
+    if (P.grounded) eyeDy = dy < -26 ? -1 : dy > 22 ? 1 : 0;
+  }
+
+  if (template) {
+    const jy = A.jit > 0.08 ? 1 : 0;
+    template.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (ch !== "o") return;
+      cput(x, y + jy, (y === 4 || y === 5) && (x < 2 || x > 13) ? 2 : (y >= 9 || x > 13) ? 3 : 1);
+    }));
+    top = 1 + jy;
+  } else {
+    for (let y = top; y <= bot; y++) {
+      const sh = y <= top + 2 ? lean : 0;
+      for (let x = 2 - wide; x <= 13 + wide; x++) cput(x + sh, y, 1);
+    }
+    const ar = Math.round(A.arm);
+    const armRow = top + 3 + ar;
+    const ext = wide;
+    for (let k = 0; k < 2; k++) {
+      cput(0 - ext, armRow + armBack + k, 2); cput(1 - ext, armRow + armBack + k, 2);
+      cput(14 + ext, armRow + armFront + k, 2); cput(15 + ext, armRow + armFront + k, 2);
+    }
+    if (ar <= -2) { cput(0 - ext, armRow - 1, 2); cput(15 + ext, armRow - 1, 2); }   // tips flung up
+    for (const l of legs) {
+      for (let k = 1; k <= l.len; k++) { cput(l.c + l.dx, bot + k, 3); cput(l.c + l.dx + 1, bot + k, 3); }
+      if (l.foot === -1) cput(l.c + l.dx, bot + l.len + 1, 3);
+    }
+  }
+
+  // eyes, v0.3's shapes, two columns apart from the middle, shifted to look
+  const ey = top + 2 + eyeDy, sh = lean;
+  const exL = 5 + eyeDx + sh, exR = 10 + eyeDx + sh;
+  if (expr === "blink") { cput(exL, ey + 1, 4); cput(exR, ey + 1, 4); }
+  else if (expr === "happy") {
+    for (const [ex, m] of [[exL, 1], [exR, -1]]) { cput(ex, ey, 4); cput(ex - m, ey + 1, 4); cput(ex + m, ey + 1, 4); }
+  } else if (expr === "ouch") {
+    for (const [ex, m] of [[exL, 1], [exR, -1]]) { cput(ex - m, ey, 4); cput(ex, ey + 1, 4); cput(ex - m, ey + 2, 4); }
+  } else { cput(exL, ey, 4); cput(exL, ey + 1, 4); cput(exR, ey, 4); cput(exR, ey + 1, 4); }
+
+  // to pixels: colour, and a normal from the shape (pointing out of his outline)
+  const flip = P.facing < 0;
+  const filled = (x, y) => x >= 0 && x < CW && y >= 0 && y < CH && cgrid[y * CW + x] !== 0;
+  for (let y = 0; y < CH; y++) {
+    for (let x = 0; x < CW; x++) {
+      const sx = flip ? CW - 1 - x : x;
+      const v = cgrid[y * CW + sx], o = (y * CW + x) * 4;
+      if (!v) { cAlb[o + 3] = 0; continue; }
+      const col = CLAWD_COLS[v];
+      cAlb[o] = col[0]; cAlb[o + 1] = col[1]; cAlb[o + 2] = col[2]; cAlb[o + 3] = 255;
+      let nx = 0, ny = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if ((dx || dy) && !filled(sx + dx, y + dy)) { const wgt = dx && dy ? 0.7 : 1; nx += dx * wgt; ny += dy * wgt; }
+      }
+      if (flip) nx = -nx;
+      const len = Math.hypot(nx, ny, 1.2);
+      cNrm[o] = Math.round((nx / len * 0.5 + 0.5) * 255);
+      cNrm[o + 1] = Math.round((ny / len * 0.5 + 0.5) * 255);
+      cNrm[o + 2] = nx || ny ? 255 : 0;
+      cNrm[o + 3] = Math.round(v / 4 * 255 * 0.999);
+    }
+  }
+}
+anim.vrnd = mulberry32(8080);     // visual-only randomness, kept off Math.random
+
+// ---------------------------------------------------------------------------
+// Visual-only state: grass springs, wisp trails and pickups, sparks
+// ---------------------------------------------------------------------------
+const WFX = wisps.map(() => ({ prev: "idle", trail: [], flash: 0, emit: 0 }));
+const SPARKS = [];
+const vr = mulberry32(2026);
+function updateGrass(dt, landing) {
+  const pcx = player.x + player.w / 2, feet = player.y + player.h;
+  const home = game.state === "ending" && game.endT > 3.6;
+  for (const set of [GRASS.back, GRASS.front]) {
+    const d = set.data, bend = set.bend, vel = set.vel;
+    const steps = Math.min(4, Math.ceil(dt / (1 / 60)));
+    const h = dt / steps;
+    for (let i = 0; i < set.n; i++) {
+      const bx = d[i * 8], by = d[i * 8 + 1], bh = d[i * 8 + 2];
+      const dx = bx - pcx;
+      let target = 0;
+      if (!home && Math.abs(dx) < 11 && feet > by - bh - 4 && feet < by + 3) {
+        const f = 1 - Math.abs(dx) / 11;
+        target = (dx < 0 ? -1 : 1) * f * Math.min(bh * 0.95, 6.5);
+      }
+      if (landing > 0 && Math.abs(dx) < 26 && Math.abs(feet - by) < 4) {
+        vel[i] += (dx < 0 ? -1 : 1) * (1 - Math.abs(dx) / 26) * Math.min(160, landing * 0.32);
+      }
+      if (target === 0 && bend[i] === 0 && vel[i] === 0) continue;
+      for (let s = 0; s < steps; s++) {
+        vel[i] += ((target - bend[i]) * 120 - vel[i] * 9) * h;
+        bend[i] += vel[i] * h;
+      }
+      if (Math.abs(bend[i]) < 0.005 && Math.abs(vel[i]) < 0.01 && target === 0) { bend[i] = 0; vel[i] = 0; }
+    }
+  }
+}
+function updateWispFx(dt) {
+  wisps.forEach((w, i) => {
+    const f = WFX[i];
+    if (f.prev === "idle" && w.state === "orbit") {          // picked up: a ring, a flash, a burst of sparks
+      f.flash = 1;
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2 + vr() * 0.3, sp = 40 + vr() * 70;
+        SPARKS.push({ x: w.x, y: w.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 15, life: 0.5 + vr() * 0.4, tot: 0.9, s: 0.9 + vr() * 0.8 });
+      }
+    }
+    f.prev = w.state;
+    f.flash = Math.max(0, f.flash - dt / 0.55);
+    f.trail.unshift([w.x, w.y]);
+    if (f.trail.length > 9) f.trail.length = 9;
+    f.emit -= dt;
+    if (f.emit <= 0 && w.state !== "fly") {                  // embers drifting up off it
+      f.emit = 0.18 + vr() * 0.35;
+      SPARKS.push({ x: w.x + (vr() - 0.5) * 3, y: w.y, vx: (vr() - 0.5) * 8, vy: -6 - vr() * 10, life: 0.8 + vr() * 0.6, tot: 1.4, s: 0.5 + vr() * 0.4 });
+    }
+  });
+  for (let i = SPARKS.length - 1; i >= 0; i--) {
+    const p = SPARKS[i];
+    p.life -= dt;
+    if (p.life <= 0) { SPARKS.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= Math.exp(-dt * 3); p.vy = p.vy * Math.exp(-dt * 3) - 6 * dt;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// One frame
+// ---------------------------------------------------------------------------
+const lightP = new Float32Array(MAXL * 4), lightC = new Float32Array(MAXL * 4);
+const GOLD = [1.0, 0.66, 0.32];
+function drawGL(w) {
+  const camX = w.camX, camY = w.camY;
+  // ---- lights: Clawd's glow, every wisp near the screen, pickup flashes, home ----
+  let nL = 0;
+  const addL = (x, y, r, c, k, z) => {
+    if (nL >= MAXL || x < camX - r || x > camX + VIEW_W + r || y < camY - r || y > camY + VIEW_H + r) return;
+    lightP.set([x, y, r, z || 0], nL * 4); lightC.set([c[0] * k, c[1] * k, c[2] * k, 0], nL * 4); nL++;
+  };
+  const lamp = Math.min(10, wispCount);
+  addL(w.pcx, w.pcy, 34 + lamp * 3.5, [1.0, 0.72, 0.42], (0.3 + 0.08 * lamp) * (0.75 + 0.25 * w.dusk) * w.clawdA, 5);
+  let eaveN = 0, eaveX = 0, eaveY = 0;
+  wisps.forEach((wp, i) => {
+    const pulse = 0.88 + 0.12 * Math.sin(wp.t * 3), fl = 0.94 + 0.06 * Math.sin(wp.t * 17 + i);
+    if (wp.state === "idle") addL(wp.x, wp.y, 60, GOLD, 1.7 * pulse * fl + WFX[i].flash * 1.4, 4);
+    else if (WFX[i].flash > 0) addL(wp.x, wp.y, 50, GOLD, WFX[i].flash * 1.6, 6);
+    else if (wp.state === "fly") addL(wp.x, wp.y, 34, GOLD, 0.45, 6);
+    else if (wp.state === "lantern") { eaveN++; eaveX += wp.x; eaveY += wp.y; }
+  });
+  if (eaveN) addL(eaveX / eaveN, eaveY / eaveN + 4, 70, GOLD, 0.5 + 0.06 * Math.min(10, eaveN), 10);
+  if (game.ended) {
+    const lit = Math.min(1, game.endT / 1.3);
+    addL(HOME.win.x + 6, HOME.win.y + 6, 70, [1.0, 0.75, 0.42], 1.6 * lit, 8);
+    addL(HOME.doorX, HOME.groundY - 12, 50, [1.0, 0.7, 0.38], 2.2 * w.door, 6);
+  }
+
+  // ---- sprites, in the groups they're drawn in ----
+  SPR.n = 0;
+  const t = w.time;
+  sprBegin("under");                             // contact shadow, leaves, dust: alpha, behind Clawd
+  if (player.grounded && w.clawdA > 0) spr(w.pcx, player.y + player.h - 0.3, 8.5, 1.9, LC("#0c0816"), 0.45 * w.clawdA, SPR_KIND.shadow);
+  for (const m of leaves) {
+    const x = m.x - camX, y = m.y - camY;
+    if (x < -6 || x > VIEW_W + 6 || y < -6 || y > VIEW_H + 6) continue;
+    const flipW = Math.cos(m.rot * 1.7 + m.ph);   // a tumble: the leaf turns edge-on and back
+    spr(m.x, m.y, 2.6 * Math.max(0.25, Math.abs(flipW)), 1.3, LC(m.col), m.a, SPR_KIND.leaf, m.rot);
+  }
+  for (const p of parts) {
+    const x = p.x - camX, y = p.y - camY;
+    if (x < -6 || x > VIEW_W + 6 || y < -6 || y > VIEW_H + 6) continue;
+    spr(p.x, p.y, p.size, p.size, LC(p.col), p.a * (p.life / p.tot), SPR_KIND.dust);
+  }
+  const behind = (wp) => wp.state === "orbit" && Math.sin(wp.t * 1.6 + wp.i * 2.4) < 0;
+  const drawWisp = (wp, i) => {
+    const x = wp.x - camX, y = wp.y - camY;
+    if (x < -20 || x > VIEW_W + 20 || y < -20 || y > VIEW_H + 20) return;
+    const pulse = 0.8 + 0.2 * Math.sin(wp.t * 3), fl = 0.9 + 0.1 * Math.sin(wp.t * 17 + i);
+    const f = WFX[i];
+    // a wild wisp is a bright orb; once it follows Clawd (or hangs at the eave) it's a small ember
+    const free = wp.state === "idle", k = free ? 1 : wp.state === "fly" ? 0.6 : 0.3;
+    const tailK = wp.state === "fly" ? 1 : free ? 0.6 : 0.2;
+    for (let j = f.trail.length - 1; j >= 1; j--) {   // a short comet tail while it moves
+      const [tx, ty] = f.trail[j], q = 1 - j / f.trail.length;
+      const mv = Math.hypot(tx - wp.x, ty - wp.y);
+      if (mv < 1.5) continue;
+      spr(tx, ty, (3.2 * q + 1) * (0.5 + 0.5 * k), (3.2 * q + 1) * (0.5 + 0.5 * k), GOLD, 0.45 * q * pulse * tailK, SPR_KIND.glow);
+    }
+    spr(wp.x, wp.y, 24 * Math.sqrt(k), 24 * Math.sqrt(k), [1.0, 0.52, 0.2], 0.34 * pulse * fl * k, SPR_KIND.glow);
+    spr(wp.x, wp.y, 8 * Math.sqrt(k), 8 * Math.sqrt(k), [1.0, 0.7, 0.36], 1.3 * pulse * fl * k, SPR_KIND.glow);
+    spr(wp.x, wp.y, 2.1 * (0.6 + 0.4 * k), 2.1 * (0.6 + 0.4 * k), [1.0, 0.9, 0.72], 6 * pulse * (0.4 + 0.6 * k), SPR_KIND.core);
+    if (f.flash > 0) {
+      const e = 1 - f.flash;
+      spr(wp.x, wp.y, 4 + e * 22, 4 + e * 22, [1.0, 0.78, 0.45], 0.7 * f.flash, SPR_KIND.ring);
+      spr(wp.x, wp.y, 12, 12, [1.0, 0.7, 0.4], 0.5 * f.flash * f.flash, SPR_KIND.glow);
+    }
+  };
+  sprBegin("wispsBehind");
+  wisps.forEach((wp, i) => { if (behind(wp)) drawWisp(wp, i); });
+  sprBegin("over");                              // added in front of Clawd: wisps, sparks, fireflies, motes
+  wisps.forEach((wp, i) => { if (!behind(wp)) drawWisp(wp, i); });
+  for (const p of SPARKS) {
+    const q = p.life / p.tot;
+    spr(p.x, p.y, 2.2 * p.s, 2.2 * p.s, [1.0, 0.72, 0.4], 0.9 * q, SPR_KIND.glow);
+    spr(p.x, p.y, 0.6 * p.s, 0.6 * p.s, [1.0, 0.92, 0.8], 3 * q, SPR_KIND.core);
+  }
+  const flyK = 0.35 + 0.65 * w.dusk;
+  for (const f of FLIES) {
+    const x = f.x + Math.sin(t * 0.37 * f.sp + f.ph) * 14, y = f.y + Math.sin(t * 0.61 * f.sp + f.ph * 1.3) * 6;
+    if (x < camX - 8 || x > camX + VIEW_W + 8 || y < camY - 8 || y > camY + VIEW_H + 8) continue;
+    const b = Math.pow(Math.max(0, Math.sin(t * f.bs + f.bl)), 6);
+    if (b < 0.02) continue;
+    spr(x, y, 5, 5, [1.0, 0.86, 0.5], 0.5 * b * flyK, SPR_KIND.glow);
+    spr(x, y, 0.8, 0.8, [1.0, 0.95, 0.75], 3 * b * flyK, SPR_KIND.core);
+  }
+  for (const m of MOTES) {
+    let x = (m.x + t * 3 * m.s + Math.sin(t * 0.2 + m.ph) * 8) % ROOM_W;
+    const y = m.y + Math.sin(t * 0.3 * m.s + m.ph) * 6;
+    if (x < camX - 4 || x > camX + VIEW_W + 4 || y < camY - 4 || y > camY + VIEW_H + 4) continue;
+    spr(x, y, 1.3, 1.3, [1.0, 0.85, 0.6], 1, SPR_KIND.mote);
+  }
+  sprBegin("fg");                                // big blurred leaves at the bottom corners
+  for (const l of FG) {
+    const x = l.x - camX * 1.6;
+    if (x < -60 || x > VIEW_W + 60) continue;
+    const sway = Math.sin(t * 0.5 + l.ph) * 0.04 + wind(l.x, t) * 0.015;
+    if (cam.dive < 0.99) spr(camX + x, camY + l.y + cam.dive * 40, l.len, l.wid, LC(l.col[0]), 0.96, SPR_KIND.fg, l.rot + sway, l.blur, l.shade);
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, G.sprBuf);
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, SPR.data.subarray(0, SPR.n * 12));
+
+  // ---- 1. sky and hills ----
+  useRT(G.bg);
+  let u = useProg("bg", w);
+  gl.uniform3fv(u.uPhB, RANGES.back.ph); gl.uniform3fv(u.uPhF, RANGES.far.ph); gl.uniform3fv(u.uPhM, RANGES.mid.ph);
+  gl.uniform4fv(u.uTF, RANGES.far.trees); gl.uniform4fv(u.uCF, RANGES.far.circ);
+  gl.uniform4fv(u.uTM, RANGES.mid.trees); gl.uniform4fv(u.uCM, RANGES.mid.circ);
+  gl.uniform2f(u.uHome, THEME.far.cottageX, THEME.far.cottageY);
+  gl.uniform1f(u.uHomeA, w.farHome);
+  fullScreen();
+
+  // ---- 2. light buffer ----
+  useRT(G.light);
+  u = useProg("light", w);
+  bindTex(0, G.sdf); gl.uniform1i(u.uSdf, 0);
+  gl.uniform2f(u.uRoom, ROOM_W, ROOM_H);
+  gl.uniform4fv(u.uL, lightP); gl.uniform4fv(u.uLc, lightC); gl.uniform1i(u.uN, nL);
+  fullScreen();
+
+  // ---- 3. terrain over the sky ----
+  useRT(G.scene);
+  u = useProg("world", w);
+  bindTex(0, G.bg.tex); gl.uniform1i(u.uBg, 0);
+  bindTex(1, G.light.tex); gl.uniform1i(u.uLight, 1);
+  bindTex(2, G.sdf); gl.uniform1i(u.uSdf, 2);
+  gl.uniform2f(u.uRoom, ROOM_W, ROOM_H);
+  gl.uniform1f(u.uS, SR);
+  gl.uniform1f(u.uScatter, 0.05);
+  gl.uniform4f(u.uHomeP, HOME.x, HOME.groundY, HOME.w, game.ended ? Math.min(1, game.endT / 1.3) : 0);
+  gl.uniform1f(u.uDoor, w.door);
+  fullScreen();
+
+  // ---- 4-7. grass, Clawd, sprites, foreground, all blended onto the scene ----
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  const grassPass = (set) => {
+    u = useProg("grass", w);
+    gl.uniform1f(u.uS, SR);
+    bindTex(1, G.light.tex); gl.uniform1i(u.uLight, 1);
+    gl.uniform2f(u.uRes, VW, VH);
+    gl.bindVertexArray(set.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, set.bendBuf);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, set.bend);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 10, set.n);
+  };
+  const sprites = (group, additive) => {
+    if (!SPR.groups[group] || !SPR.groups[group].n) return;
+    u = useProg("spr", w);
+    bindTex(1, G.light.tex); gl.uniform1i(u.uLight, 1);
+    gl.uniform2f(u.uRes, VW, VH);
+    if (additive) gl.blendFunc(gl.ONE, gl.ONE); else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    drawGroup(group);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  };
+  grassPass(GRASS.back);
+  sprites("under", false);
+  sprites("wispsBehind", true);
+  if (w.clawdA > 0) {
+    u = useProg("clawd", w);
+    gl.bindVertexArray(G.vaoEmpty);
+    bindTex(3, G.clawdAlb); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, CW, CH, gl.RGBA, gl.UNSIGNED_BYTE, cAlb); gl.uniform1i(u.uAlb, 3);
+    bindTex(4, G.clawdNrm); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, CW, CH, gl.RGBA, gl.UNSIGNED_BYTE, cNrm); gl.uniform1i(u.uNrm, 4);
+    // whole screen pixels per sprite pixel, like v0.3, with the feet on the hitbox
+    const k = Math.max(1, Math.round(SR));
+    const fxp = Math.round((w.footX - camX) * SR), fyp = Math.round((w.footY - camY) * SR);
+    gl.uniform4f(u.uRect, fxp - (CW / 2) * k, fyp - CH * k, CW * k, CH * k);
+    gl.uniform2f(u.uRes, VW, VH);
+    gl.uniform2f(u.uFoot, w.footX, w.footY);
+    gl.uniform2f(u.uGrid, CW, CH);
+    gl.uniform1f(u.uAlpha, w.clawdA);
+    gl.uniform4fv(u.uL, lightP); gl.uniform4fv(u.uLc, lightC); gl.uniform1i(u.uN, nL);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  grassPass(GRASS.front);
+  sprites("over", true);
+  sprites("fg", false);
+  gl.disable(gl.BLEND);
+
+  // ---- 8. bloom ----
+  const B = G.bloom;
+  if (B.length) {
+    u = useProg("down", w);
+    gl.uniform1i(u.uSrc, 0);
+    let src = G.scene;
+    for (let i = 0; i < B.length; i++) {
+      useRT(B[i]);
+      bindTex(0, src.tex);
+      gl.uniform2f(u.uTexel, 1 / src.w, 1 / src.h);
+      gl.uniform1f(u.uFirst, i === 0 ? 1 : 0);
+      gl.uniform1f(u.uThresh, 1.0); gl.uniform1f(u.uKnee, 0.5);
+      fullScreen();
+      src = B[i];
+    }
+    u = useProg("up", w);
+    gl.uniform1i(u.uSrc, 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    for (let i = B.length - 1; i > 0; i--) {
+      useRT(B[i - 1]);
+      bindTex(0, B[i].tex);
+      gl.uniform2f(u.uTexel, 1 / B[i].w, 1 / B[i].h);
+      fullScreen();
+    }
+    gl.disable(gl.BLEND);
+  }
+
+  // ---- to the screen ----
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, screen.width, screen.height);
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.viewport(outX, screen.height - outY - outH, outW, outH);
+  u = useProg("final", w);
+  bindTex(0, G.scene.tex); gl.uniform1i(u.uScene, 0);
+  bindTex(1, B.length ? B[0].tex : G.scene.tex); gl.uniform1i(u.uBloom, 1);
+  gl.uniform1f(u.uBloomK, B.length ? 0.65 : 0);
+  gl.uniform1f(u.uExpo, 1.0);
+  gl.uniform1f(u.uGrain, 0.028);
+  gl.uniform2f(u.uRes, outW, outH);
+  fullScreen();
+}
+
+// ---------------------------------------------------------------------------
+// Resize, init
+// ---------------------------------------------------------------------------
+function onResize() {
+  // Physical pixels, capped at 2 (audit finding 5), as v0.3 does.
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const pw = Math.round(innerWidth * dpr), ph = Math.round(innerHeight * dpr);
+  for (const c of [screen, hudCv]) {
+    c.width = pw; c.height = ph;
+    c.style.width = innerWidth + "px"; c.style.height = innerHeight + "px";
+  }
+  S = Math.min(pw / VIEW_W, ph / VIEW_H);
+  offX = (pw - VIEW_W * S) / 2;
+  offY = (ph - VIEW_H * S) / 2;
+  outW = Math.round(VIEW_W * S); outH = Math.round(VIEW_H * S);
+  outX = Math.round(offX); outY = Math.round(offY);
+  SR = Math.min(S, QUAL.maxS);
+  VW = Math.round(VIEW_W * SR); VH = Math.round(VIEW_H * SR);
+  if (gl) glTargets();
+}
+if (gl) glInit();
+addEventListener("resize", onResize);
+onResize();
+
+// ---------------------------------------------------------------------------
+// render(): v0.3's bookkeeping in v0.3's order (the clocks, the wisps, the particles),
+// then the WebGL frame, then v0.3's HUD.
+// ---------------------------------------------------------------------------
+let playT = 0; // seconds of play — fades the control hint out after a few seconds
+function render(fps, dt) {
+  const cx = Math.round(cam.x);
+  game.t += dt;
+  if (game.state !== "title") playT += dt;
+  if (game.state !== "title" && game.tfade < 1) game.tfade = Math.min(1, game.tfade + dt / 0.7);
+  if (game.ended) game.endT += dt;
+  // dusk deepens as the camera travels toward home (0 at spawn, 1 at the cottage)
+  const duskD = clamp((cx + VIEW_W / 2 - 260) / 1200, 0, 1);
+  updateAmbient(dt, duskD);
+  updateLeaves(dt);
+
+  const expr = player.ouchT > 0 ? "ouch"
+    : (game.ended && game.endT < 7) ? "happy"
+    : fx.sitT > 1.5 ? "happy"
+    : player.idleT > THEME.face.happyAfter ? "happy"
+    : player.blinkT > 0 ? "blink" : "open";
+  const clawdA = game.ended ? 1 - clamp((game.endT - 3.6) / 0.6, 0, 1) : 1;
+
+  // v0.3's effects bookkeeping: the same particles, from the same events
+  const landing = fx.landImpact;
+  if (fx.landImpact > 0) {
+    fx.squash = Math.min(0.3, fx.landImpact / 900);
+    fx.squashT = 0.16;
+    const n = 3 + Math.min(6, (fx.landImpact / 60) | 0);
+    for (let i = 0; i < n; i++)
+      spawnPart(player.x + player.w / 2 + (Math.random() - 0.5) * 10, player.y + player.h,
+        (Math.random() - 0.5) * 70, -(10 + Math.random() * 40),
+        0.3 + Math.random() * 0.15, 1 + Math.random() * 1.5, THEME.mist.tint, 0.5);
+    fx.landImpact = 0;
+  }
+  if (fx.jumped) {
+    for (let i = 0; i < 3; i++)
+      spawnPart(player.x + player.w / 2 + (Math.random() - 0.5) * 8, player.y + player.h,
+        (Math.random() - 0.5) * 50, 10 + Math.random() * 20,
+        0.25, 1 + Math.random(), THEME.mist.tint, 0.4);
+    fx.jumped = false;
+  }
+  if (fx.airjumped) {                                     // a ring of air kicked out underfoot
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2;
+      spawnPart(player.x + player.w / 2 + Math.cos(a) * 4, player.y + player.h - 2,
+        Math.cos(a) * 52, Math.sin(a) * 14 + 6,
+        0.3, 1 + Math.random(), THEME.mist.tint, 0.5);
+    }
+    fx.squash = -0.16;
+    fx.squashT = 0.16;
+    fx.airjumped = false;
+    anim.tuck = 0.14;
+  }
+  if (fx.walljumped) {                                    // dust kicked off the wall face
+    const wx = player.x + (player.clingSide > 0 ? player.w : 0);
+    for (let i = 0; i < 4; i++)
+      spawnPart(wx, player.y + 2 + Math.random() * 7,
+        -player.clingSide * (25 + Math.random() * 45), 10 + Math.random() * 25,
+        0.3, 1 + Math.random(), THEME.mist.tint, 0.45);
+    fx.walljumped = false;
+  }
+  fx.kickT -= dt;
+  if (player.clinging && player.vy > 5 && fx.kickT <= 0) {              // scrape while sliding
+    fx.kickT = 0.09;
+    const wx = player.x + (player.clingSide > 0 ? player.w : 0);
+    spawnPart(wx, player.y + 3 + Math.random() * 6,
+      -player.clingSide * (8 + Math.random() * 16), -(4 + Math.random() * 12),
+      0.35, 1, THEME.mist.tint, 0.4);
+  }
+  if (player.grounded && Math.abs(player.vx) > 110 && fx.kickT <= 0) {   // grass flecks
+    fx.kickT = 0.12;
+    spawnPart(player.x + (player.vx > 0 ? 0 : player.w), player.y + player.h - 1,
+      -Math.sign(player.vx) * (20 + Math.random() * 30), -(20 + Math.random() * 30),
+      0.4, 1.2, Math.random() < 0.4 ? THEME.grassGlow : THEME.grass, 0.7);
+  }
+  composeClawd(dt, expr);                    // reads fx.squash/squashT before they run down
+  if (fx.squashT > 0) fx.squashT -= dt;
+
+  updateWisps(dt);
+  updateParts(dt);
+  updateWispFx(dt);
+  updateGrass(dt, landing);
+
+  if (gl) {
+    drawGL({
+      camX: cam.x, camY: cam.y, time: game.t, dusk: duskD,
+      farHome: farHomeAlpha(cx), clawdA,
+      door: game.ended ? Math.sin(Math.PI * clamp((game.endT - 3.3) / 1.6, 0, 1)) : 0,
+      pcx: player.x + player.w / 2, pcy: player.y + player.h / 2 - 2,
+      footX: player.x + player.w / 2, footY: player.y + player.h,
+    });
+  }
+  drawHud(fps);
+}
+
+// v0.3's HUD, unchanged, drawn on the transparent canvas over the WebGL one.
+function drawHud(fps) {
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.clearRect(0, 0, hudCv.width, hudCv.height);
+  // ---- HUD at native resolution (drawn after transform reset = razor sharp) ----
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  const PX = d => offX + d * S, PY = d => offY + d * S, PS = d => d * S;
+  sctx.textBaseline = "top";
+
+  if (debugOn) {
+    sctx.fillStyle = "rgba(0,0,0,0.6)";
+    sctx.fillRect(PX(2), PY(2), PS(184), PS(70));
+    sctx.fillStyle = "#7CFC9A";
+    sctx.font = PS(8) + "px monospace";
+    const L = [
+      "pos  " + player.x.toFixed(1) + ", " + player.y.toFixed(1),
+      "vel  " + player.vx.toFixed(1) + ", " + player.vy.toFixed(1),
+      "grounded " + player.grounded + "  facing " + (player.facing > 0 ? "R" : "L"),
+      "coyote " + (player.coyote * 1000).toFixed(0) + "ms  buffer " + (player.buffer * 1000).toFixed(0) + "ms  air " + player.airJumpsLeft,
+      "cling " + (player.clinging ? (player.clingSide > 0 ? "R" : "L") : "-") +
+        "  wallCoy " + (player.wallCoyote * 1000).toFixed(0) + "ms  lock " + (player.wallLock * 1000).toFixed(0) + "ms",
+      "fps " + fps.toFixed(0) + "  cam " + cam.x.toFixed(0) + "," + cam.y.toFixed(0),
+    ];
+    for (let i = 0; i < L.length; i++) sctx.fillText(L[i], PX(6), PY(6 + i * 10));
+  }
+
+  // Letter-spaced capitals like the posters, centred on x. Spaced by hand, because
+  // canvas letterSpacing isn't in every browser yet.
+  const spaced = (text, x, y, gap) => {
+    const ws = [...text].map((ch) => sctx.measureText(ch).width);
+    let px = x - (ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1)) / 2;
+    sctx.textAlign = "left";
+    [...text].forEach((ch, i) => { sctx.fillText(ch, px, y); px += ws[i] + gap; });
+  };
+
+  // hint — native-res sans-serif, fades out after the first few seconds of play
+  // (skipped on touch devices — they have on-screen buttons instead)
+  const hintA = (isTouch || game.state === "title") ? 0 : Math.max(0, Math.min(0.55, (6 - playT) * 0.6));
+  if (hintA > 0.002) {
+    sctx.fillStyle = "rgba(235,240,245," + hintA.toFixed(3) + ")";
+    sctx.font = "600 " + PS(8.5) + "px system-ui, -apple-system, sans-serif";
+    sctx.textAlign = "center";
+    sctx.fillText("arrows / A D  move      space  jump      R  reset      M  mute      `  debug",
+      PX(VIEW_W / 2), PY(VIEW_H - 15));
+    sctx.textAlign = "left";
+  }
+
+  // wisp counter — quiet, top-right, only once you've met one
+  if (wispCount > 0) {
+    const wcx = PX(VIEW_W - 24), wcy = PY(12);
+    sctx.globalAlpha = 0.6;
+    const g = sctx.createRadialGradient(wcx, wcy, 0.5, wcx, wcy, PS(5));
+    g.addColorStop(0, "rgba(255,230,170,0.9)");
+    g.addColorStop(1, "rgba(255,200,120,0)");
+    sctx.fillStyle = g;
+    sctx.fillRect(wcx - PS(5), wcy - PS(5), PS(10), PS(10));
+    sctx.fillStyle = "#ffe9c4";
+    sctx.font = "600 " + PS(8) + "px system-ui, sans-serif";
+    sctx.textAlign = "left";
+    sctx.fillText(String(wispCount), wcx + PS(7), wcy - PS(4));
+    sctx.globalAlpha = 1;
+  }
+
+  // title card — fades away on the first input
+  const titleA = 1 - game.tfade;
+  if (titleA > 0.002) {
+    // on the open sky above the ledges, the way the posters set it; the prompt sits on
+    // the dark earth at the bottom
+    const tg = sctx.createLinearGradient(0, offY, 0, offY + PS(150));
+    tg.addColorStop(0, "rgba(10,8,22," + (0.35 * titleA).toFixed(3) + ")");
+    tg.addColorStop(1, "rgba(10,8,22,0)");
+    sctx.fillStyle = tg;
+    sctx.fillRect(offX, offY, VIEW_W * S, PS(150));
+    sctx.fillStyle = "rgba(255,233,196," + (0.95 * titleA).toFixed(3) + ")";
+    sctx.font = PS(26) + "px Georgia, 'Times New Roman', serif";
+    spaced("CLAWDVANIA", PX(VIEW_W / 2), PY(34), PS(3.2));
+    sctx.fillStyle = "rgba(255,233,196," + (0.72 * titleA).toFixed(3) + ")";
+    sctx.font = "600 " + PS(7) + "px system-ui, sans-serif";
+    spaced("A WALK HOME AT DUSK", PX(VIEW_W / 2), PY(70), PS(2.6));
+    const pulse = 0.45 + 0.3 * Math.sin(game.t * 2.2);
+    sctx.fillStyle = "rgba(235,240,245," + (pulse * titleA).toFixed(3) + ")";
+    sctx.font = "600 " + PS(8) + "px system-ui, sans-serif";
+    sctx.textAlign = "center";
+    sctx.fillText(isTouch ? "tap to begin" : "press any key to begin", PX(VIEW_W / 2), PY(262));
+    sctx.textAlign = "left";
+  }
+
+  // end card — welcome home
+  if (game.ended) {
+    const a = Math.min(1, Math.max(0, (game.endT - 2.2) / 1)) *
+              (1 - Math.min(1, Math.max(0, (game.endT - 8.5) / 1.5)));
+    if (a > 0.002) {
+      sctx.textAlign = "center";
+      sctx.fillStyle = "rgba(255,233,196," + (0.9 * a).toFixed(3) + ")";
+      sctx.font = "700 " + PS(17) + "px Georgia, 'Times New Roman', serif";
+      sctx.fillText("welcome home", PX(VIEW_W / 2), PY(92));
+      const sub = wispCount >= WISP_SPOTS.length ? "every last wisp came home with you"
+        : wispCount > 0 ? wispCount + (wispCount === 1 ? " wisp" : " wisps") + " followed you home"
+        : "the dusk walked you home";
+      sctx.fillStyle = "rgba(235,240,245," + (0.6 * a).toFixed(3) + ")";
+      sctx.font = "italic " + PS(9) + "px Georgia, serif";
+      sctx.fillText(sub, PX(VIEW_W / 2), PY(118));
+      sctx.textAlign = "left";
+    }
+  }
+
+  // closing — once the welcome has faded, night settles over the cottage and a last card
+  // offers the walk again (startGame handles the key or tap)
+  if (game.ended && game.endT > 10) {
+    const k = Math.min(1, (game.endT - 10) / 2);
+    sctx.fillStyle = "rgba(10,8,22," + (0.45 * k).toFixed(3) + ")";
+    sctx.fillRect(offX, offY, VIEW_W * S, VIEW_H * S);
+    sctx.fillStyle = "rgba(255,233,196," + (0.9 * k).toFixed(3) + ")";
+    sctx.font = PS(18) + "px Georgia, 'Times New Roman', serif";
+    spaced("CLAWDVANIA", PX(VIEW_W / 2), PY(96), PS(2.4));
+    sctx.fillStyle = "rgba(235,240,245," + (0.65 * k).toFixed(3) + ")";
+    sctx.font = "italic " + PS(9) + "px Georgia, serif";
+    sctx.textAlign = "center";
+    sctx.fillText("thanks for walking home", PX(VIEW_W / 2), PY(124));
+    sctx.fillStyle = "rgba(235,240,245," + (0.5 * k).toFixed(3) + ")";
+    sctx.font = PS(7.5) + "px Georgia, 'Times New Roman', serif";
+    sctx.fillText("by Satej Patil · made with Claude Code", PX(VIEW_W / 2), PY(146));
+    if (game.endT > WALK_AGAIN_T) {
+      const pulse = 0.45 + 0.3 * Math.sin(game.t * 2.2);
+      sctx.fillStyle = "rgba(235,240,245," + (pulse * k).toFixed(3) + ")";
+      sctx.font = "600 " + PS(8) + "px system-ui, sans-serif";
+      sctx.fillText(isTouch ? "tap to walk again" : "press any key to walk again", PX(VIEW_W / 2), PY(262));
+    }
+    sctx.textAlign = "left";
+  }
+}
+
+// ============================================================================
+// Fixed-timestep loop (accumulator). Delta clamped; accumulator reset on
+// tab-visibility regain (Topple's tab-hidden desync bug — not repeating it).
+// ============================================================================
+let last = performance.now();
+let acc = 0;
+let fpsSmooth = 60;
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) { last = performance.now(); acc = 0; }
+});
+
+function frame(now) {
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.1) dt = 0.1;               // clamp huge deltas (tab switch, hitching)
+  if (dt > 0) fpsSmooth += (1 / dt - fpsSmooth) * 0.05;
+
+  acc += dt;
+  while (acc >= STEP) {
+    updatePlayer(STEP);
+    updateCamera();
+    acc -= STEP;
+  }
+  render(fpsSmooth, dt);
+  requestAnimationFrame(frame);
+}
+
+resetPlayer();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
